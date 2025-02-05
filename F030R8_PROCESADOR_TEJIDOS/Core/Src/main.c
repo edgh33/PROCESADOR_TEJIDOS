@@ -27,6 +27,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "string.h"
+#include "stdlib.h"
+#include "USR_NEXTION.h"
+#include "USR_RTC.h"
+#include "USR_FLASH.h"
+#include "USR_TIM.h"
+#include "USR_PROCESADOR.h"
+#include "USR_TEMPERATURA.h"
 
 /* USER CODE END Includes */
 
@@ -54,7 +62,12 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+#if USR_TEST_TERMOCUPLAS == 1
 
+uint8_t contador = 0;
+uint8_t texto_temperatura[30];
+
+#endif
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -101,6 +114,82 @@ int main(void)
   MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
 
+  //SE LEEN LAS MEMORIAS, SE VERIFICAN QUE ESTEN BIEN CONFIGURADAS Y SI NO, SE REINICIAN!!!
+	USR_FLASH_Leer_Programa(1);
+	if(USR_FLASH_Obtener_Dato_Trama(USR_PROCESADOR_POSICION_COMANDO) != USR_NEXTION_COMANDO_GUARDAR_PROGRAMA)
+	{
+	  USR_FLASH_Reiniciar_Programas();
+	}
+
+	USR_FLASH_Leer_Termocuplas();
+	if(USR_FLASH_Obtener_Dato_Trama(USR_PROCESADOR_POSICION_COMANDO) != USR_NEXTION_COMANDO_GUARDAR_TERMOCUPLAS)
+	{
+	  USR_FLASH_Reiniciar_Termocuplas();
+	}
+
+	USR_FLASH_Leer_Estado_Actual();
+	if(USR_FLASH_Obtener_Dato_Trama_Estado_Actual(USR_PROCESADOR_POSICION_COMANDO) != USR_NEXTION_COMANDO_GUARDAR_PROGRAMA)
+	{
+	  USR_FLASH_Reiniciar_Estado_Actual();
+	}
+
+	//Se inician los led apagados
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_1, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_2, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_3, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_4, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_5, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_6, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+
+	//Se apage el pin del buzzer
+	USR_PROCESADOR_BUZZER_OFF();
+
+	//Los pines de los reles inician activos...
+	USR_PROCESADOR_RELE_START_ACTIVO();
+	USR_PROCESADOR_RELE_MANUAL_ACTIVO();
+
+	//Se inactiva la salida AC de la tarjeta...
+	USR_PROCESADOR_ReleAC(USR_PROCESADOR_RELEAC_INACTIVO);
+
+	//Se inician las termocuplas...
+	#if USR_TEST_SIN_CONTROL == 0
+
+	USR_TEMPERATURA_Iniciar_Chips();
+	if(usr_temperatura_estado_alerta == USR_TEMPERATURA_ALERTA_ACTIVA)
+	{
+	  USR_NEXTION_Cambiar_Pantalla(USR_NEXTION_PANTALLA_ALERTA);
+	}
+
+	#endif
+
+	//Se hace un retardo de 3 segundos para dejar que se encienda la pantalla
+	HAL_Delay(3000);
+
+	//Se revisa si hay un programa activo
+	USR_FLASH_Leer_Estado_Actual();
+	if((USR_FLASH_Obtener_Dato_Trama_Estado_Actual(USR_PROCESADOR_POSICION_ESTADO_ACTUAL) == USR_PROCESADOR_ESTADO_EJECUTANDO) || (USR_FLASH_Obtener_Dato_Trama_Estado_Actual(USR_PROCESADOR_POSICION_ESTADO_ACTUAL) == USR_PROCESADOR_ESTADO_ROTANDO))
+	{
+	  USR_PROCESADOR_Retomar_Programa_Actual();
+	  //Se reinicia el periferico I2C porque se bloquea despues de retomar el programa
+	  MX_I2C2_Init();
+
+	}
+	else
+	{
+	  USR_NEXTION_Enviar_Trama(usr_nextion_com_vison_b0, (uint16_t)strlen((const char *)usr_nextion_com_vison_b0));
+	  //Se crea una trama de estado actual para evitar errores en los cambios de la misma
+	  USR_FLASH_Iniciar_Trama_Estado_Actual();
+	}
+	HAL_Delay(50);
+
+	USR_NEXTION_Iniciar_Recibir_Trama();
+	//Se inicia el control de temperatura...
+	USR_TEMPERATURA_Iniciar_Control();
+	//Se inicia el conteo del minuto
+	USR_TIM_Iniciar_Conteo_1minuto();
+
+	USR_PROCESADOR_Buzzer();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,6 +199,58 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+#if USR_TEST_TERMOCUPLAS == 0
+
+	//Rutina principal de maquina de estados...
+	USR_NEXTION_Administrador();
+	if(usr_procesador_estado_actual == USR_PROCESADOR_ESTADO_EJECUTANDO)
+	{
+		USR_PROCESADOR_Ejecutar_Programa();
+
+	}
+#if USR_TEST_SIN_CONTROL == 0
+	if(usr_tim_estado_control_temperatura == USR_TIM_BANDERA_CONTROL_TEMPERATURA_CAMBIO)
+	{
+		USR_NEXTION_Inhabilitar_Touch_Pantalla();
+		USR_TEMPERATURA_Control();
+		if(usr_temperatura_estado_alerta == USR_TEMPERATURA_ALERTA_ACTIVA)
+	    {
+			USR_NEXTION_Cambiar_Pantalla(USR_NEXTION_PANTALLA_ALERTA);
+		}
+		USR_NEXTION_Verificar_Temperatura();
+		USR_NEXTION_Habilitar_Touch_Pantalla();
+	}
+#endif
+
+#endif
+
+#if USR_TEST_TERMOCUPLAS == 1
+
+	for(contador = 0; contador < USR_TEMPERATURA_CANTIDAD_TERMOCUPLAS; contador++)
+	{
+	  USR_TEMPERATURA_Leer_Temperatura(&arreglo_termocuplas[contador]);
+
+	  if(arreglo_termocuplas[contador].estado_termocupla == USR_TEMPERATURA_ESTADO_TERMOCUPLA_OK)
+	  {
+		  sprintf((char *)texto_temperatura, "Temp. Termocupla %d: %d\n", arreglo_termocuplas[contador].numero_termocupla+1,arreglo_termocuplas[contador].temperatura_actual);
+		  HAL_UART_Transmit(&huart2, texto_temperatura, strlen((char *)texto_temperatura), 50);
+	  }
+	  else if (arreglo_termocuplas[contador].estado_termocupla == USR_TEMPERATURA_ESTADO_TERMOCUPLA_ABIERTA)
+	  {
+		  sprintf((char *)texto_temperatura, "Termocupla %d abierta...\n", arreglo_termocuplas[contador].numero_termocupla+1);
+		  HAL_UART_Transmit(&huart2, texto_temperatura, strlen((char *)texto_temperatura), 50);
+	  }
+	  else
+	  {
+		  sprintf((char *)texto_temperatura, "Termocupla %d en error...\n", arreglo_termocuplas[contador].numero_termocupla+1);
+		  HAL_UART_Transmit(&huart2, texto_temperatura, strlen((char *)texto_temperatura), 50);
+	  }
+
+	}
+	HAL_Delay(1000);
+#endif
+
   }
   /* USER CODE END 3 */
 }
@@ -175,6 +316,10 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_6, USR_TEMPERATURA_ESTADO_LED_ROJO);
+	HAL_Delay(250);
+	USR_TEMPERATURA_Cambio_Led(USR_TEMPERATURA_LED_6, USR_TEMPERATURA_ESTADO_LED_APAGADO);
+	HAL_Delay(250);
   }
   /* USER CODE END Error_Handler_Debug */
 }

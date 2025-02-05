@@ -134,6 +134,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
+#define USR_TEST_TERMOCUPLAS   	0
+#define USR_TEST_SIN_CONTROL  	0
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

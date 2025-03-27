@@ -21,7 +21,7 @@ extern "C" {
 
 #define EDG_CONFIG_IDE_SEL EDG_CONFIG_IDE_CUBEIDE
 
-#define EDG_CONFIG_VERSION_FIRMWARE		"Firmware V2.0.1"
+#define EDG_CONFIG_VERSION_FIRMWARE		"Firmware V2.0.0"
 
 #ifndef true
 #define true 1

@@ -12,7 +12,8 @@
 EDG_STATE_MACHINE_HandleTypeDef hedgStateMachine;
 
 #if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
-uint8_t stringDebug[100] = {0};
+uint8_t stringDebug[200] = {0};
+uint8_t tempVal = 0;
 #endif
 
 /* State Machine Functions -------------------------------------*/
@@ -72,6 +73,17 @@ void EDG_STATE_MACHINE_Admin(EDG_STATE_MACHINE_HandleTypeDef * ptrhedgStateMachi
 		case EDG_STATE_MACHINE_STATE_TEMPERATURE_CONTROL:
 
 			EDG_STATE_MACHINE_TemperatureControlState();
+
+			break;
+
+		case EDG_STATE_MACHINE_STATE_PROCESS:
+
+
+			break;
+
+		case EDG_STATE_MACHINE_STATE_MANUAL:
+
+			EDG_STATE_MACHINE_Manual();
 
 			break;
 
@@ -317,14 +329,14 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 			{
 				/*** Come back from alarm ***/
 				EDG_AC_CONTROL_CloseAcRelay();
-				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_CONFIG);
+				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
 				EDG_STATE_MACHINE_SetConfigPage();
 				EDG_BUZZER_SetMode(&hedgBuzzer, EDG_BUZZER_MODE_ONE_PULSE);
 
 			}
 			else
 			{
-				if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_CONFIG)
+				if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 				{
 					EDG_STATE_MACHINE_RefreshConfigPage();
 				}
@@ -355,6 +367,7 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
   */
 void EDG_STATE_MACHINE_ExecCommandState(void)
 {
+	EDG_STATE_MACHINE_StateTypeDef NextState = EDG_STATE_MACHINE_STATE_IDLE;
 	EDG_BUZZER_Pulse(&hedgBuzzer);
 	EDG_NEXTION_GetAllDataReceived(&hedgNextion);
 	HAL_Delay(50);
@@ -368,9 +381,9 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 			break;
 
-		case EDG_NEXTION_COMMAND_CHANGE_TEMPERATURE:
+		case EDG_NEXTION_COMMAND_LOAD_PROGRAM_VALUES:
 
-			EDG_STATE_MACHINE_ChangeTemperature();
+			//EDG_STATE_MACHINE_ChangeTemperature();
 
 			break;
 
@@ -381,34 +394,35 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 			break;
 
-		case EDG_NEXTION_COMMAND_PASSWORD:
+		case EDG_NEXTION_COMMAND_PAUSE_PROCESS:
 
 			break;
 
-		case EDG_NEXTION_COMMAND_SET_THERMOCOUPLES:
+		case EDG_NEXTION_COMMAND_STOP_PROCESS:
 
 			break;
 
-		case EDG_NEXTION_COMMAND_LOAD_PROGRAM_VALUES:
+		case EDG_NEXTION_COMMAND_SET_TEMPERATURE:
 
-			EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
+			//EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
 
 			break;
 
-		case EDG_NEXTION_COMMAND_SAVE_PROGRAM_VALUES:
+		case EDG_NEXTION_COMMAND_RUN_PROCESS:
 
-			EDG_STATE_MACHINE_SaveProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
+			//EDG_STATE_MACHINE_SaveProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
 
 			break;
 
 		case EDG_NEXTION_COMMAND_SAVE_SCHEDULE:
 
+			/*
 			EDG_STATE_MACHINE_SaveScheduleValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
 			EDG_STATE_MACHINE_LoadScheduleValues();
 			EDG_SCHEDULE_GetScheduleToday(&hedgSchedule, &hedgRTC);
 			EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 			EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
-
+			 */
 			break;
 
 		case EDG_NEXTION_COMMAND_RESET:
@@ -438,6 +452,16 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 			break;
 
+		case EDG_NEXTION_COMMAND_MANUAL_MODE:
+
+			tempVal = hedgNextion.DataReceived[1];
+			NextState = EDG_STATE_MACHINE_STATE_MANUAL;
+			break;
+
+		case EDG_NEXTION_COMMAND_SAVE_PROGRAM:
+
+			break;
+
 		default:
 
 			break;
@@ -447,10 +471,13 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 	EDG_NEXTION_SetCurrentBright(&hedgNextion);
 	EDG_NEXTION_RestartBrightTim(&hedgNextion);
 	EDG_NEXTION_StartReceiveFrame(&hedgNextion);
-	EDG_NEXTION_EnableTouch(&hedgNextion);
+	if(NextState == EDG_STATE_MACHINE_STATE_IDLE)
+	{
+		EDG_NEXTION_EnableTouch(&hedgNextion);
+	}
 	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	/*** Change to the respective state  ***/
-	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
+	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, NextState);
 	return;
 }
 
@@ -482,19 +509,202 @@ void EDG_STATE_MACHINE_AlarmState(void)
 void EDG_STATE_MACHINE_TestState(void)
 {
 
-	EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 0, 50);
-	EDG_WS2812_Pixel(&hedgWs2812, 1, 0, 50, 50);
-	EDG_WS2812_Pixel(&hedgWs2812, 2, 50, 0, 50);
-	EDG_WS2812_Pixel(&hedgWs2812, 3, 50, 0, 0);
-	EDG_WS2812_Pixel(&hedgWs2812, 4, 0, 50, 0);
-	EDG_WS2812_Pixel(&hedgWs2812, 5, 50, 50, 00);
+	EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 0, 0);
+	EDG_WS2812_Pixel(&hedgWs2812, 1, 0, 0, 0);
+	EDG_WS2812_Pixel(&hedgWs2812, 2, 0, 0, 0);
+	EDG_WS2812_Pixel(&hedgWs2812, 3, 0, 0, 0);
+	EDG_WS2812_Pixel(&hedgWs2812, 4, 0, 0, 0);
+	EDG_WS2812_Pixel(&hedgWs2812, 5, 0, 0, 0);
 
 	EDG_WS2812_SendSpi(&hedgWs2812);
 
-	while(1)
 
+	// LOGICA DEL CICLO!!!!!!
+	//Inicia siempre con los reles inactivos
+	EDG_RELE_AGITAR_INACTIVO();
+	EDG_RELE_ELEVAR_INACTIVO();
+
+	//Se debe buscar siempre inicialmente tener el equipo con
+	//el carrusel abajo para poder hacer la logica del ciclo
+
+	//Si el carrusel esta abajo se puede comenzar a agitar
+	if(EDG_SENSOR_POSICION())
 	{
-		HAL_Delay(1000);
+		EDG_RELE_AGITAR_ACTIVO();
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 50, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d%02d-%02d:%02d%02d]Procesador en posicion de agitar, iniciando ciclo...\r\n", hedgRTC.CurrentDate.Hour,
+																															  hedgRTC.CurrentDate.Minute,
+																															  hedgRTC.CurrentDate.Second,
+																															  hedgRTC.CurrentDate.Day,
+																															  hedgRTC.CurrentDate.Month,
+																															  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+
+	}
+	//Si el carrusel no esta abajo se activa el rele de posicion hasta
+	//que se detecte que esta abajo
+	else
+	{
+
+		EDG_RELE_ELEVAR_ACTIVO();
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 50);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Buscando posicion de agitar...\r\n", hedgRTC.CurrentDate.Hour,
+																															  hedgRTC.CurrentDate.Minute,
+																															  hedgRTC.CurrentDate.Second,
+																															  hedgRTC.CurrentDate.Day,
+																															  hedgRTC.CurrentDate.Month,
+																															  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+		while(!EDG_SENSOR_POSICION());
+		//Cuando se detecta que esta abajo se comienza a agitar
+		EDG_RELE_ELEVAR_INACTIVO();
+		EDG_RELE_AGITAR_ACTIVO();
+		HAL_Delay(200);
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 50, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Posicion de agitar encontrada, iniciando ciclo...\r\n", hedgRTC.CurrentDate.Hour,
+																														  hedgRTC.CurrentDate.Minute,
+																														  hedgRTC.CurrentDate.Second,
+																														  hedgRTC.CurrentDate.Day,
+																														  hedgRTC.CurrentDate.Month,
+																														  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+
+	}
+
+	//Se espera el tiempo de agitacion programado por el ciclo
+	HAL_Delay(10000);
+
+	while(1)
+	{
+
+		//Cuando se cumple el tiempo se hace el proceso de elevar el carrusel
+		//deteniendo el agitar y activando el rele de posicion
+		EDG_RELE_AGITAR_INACTIVO();
+		EDG_RELE_ELEVAR_ACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 50, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Elevando Carrusel...\r\n", hedgRTC.CurrentDate.Hour,
+																							  hedgRTC.CurrentDate.Minute,
+																							  hedgRTC.CurrentDate.Second,
+																							  hedgRTC.CurrentDate.Day,
+																							  hedgRTC.CurrentDate.Month,
+																							  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+		//Se espera un proceso de no sensado de carrusel y uno de sensado para
+		//saber que el carrusel esta arriba
+		while(!EDG_SENSOR_CARRUSEL());
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Aun Elevando Carrusel...\r\n", hedgRTC.CurrentDate.Hour,
+																							  hedgRTC.CurrentDate.Minute,
+																							  hedgRTC.CurrentDate.Second,
+																							  hedgRTC.CurrentDate.Day,
+																							  hedgRTC.CurrentDate.Month,
+																							  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+		while(EDG_SENSOR_CARRUSEL());
+		//Cuando el carrusel esta arriba se inactiva el rele de elevar
+		EDG_RELE_ELEVAR_INACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Carrusel arriba, esperando escurrido...\r\n", hedgRTC.CurrentDate.Hour,
+																												  hedgRTC.CurrentDate.Minute,
+																												  hedgRTC.CurrentDate.Second,
+																												  hedgRTC.CurrentDate.Day,
+																												  hedgRTC.CurrentDate.Month,
+																												  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+
+		//Espera de tiempo con el carrusel arriba para escurrido de la muestra
+		HAL_Delay(5000);
+
+		//Se vuelve a activar el rele de elevar para que baje el carrusel
+		EDG_RELE_ELEVAR_ACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 50);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Bajando Carrusel...\r\n", hedgRTC.CurrentDate.Hour,
+																							  hedgRTC.CurrentDate.Minute,
+																							  hedgRTC.CurrentDate.Second,
+																							  hedgRTC.CurrentDate.Day,
+																							  hedgRTC.CurrentDate.Month,
+																							  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+		//Se espera hasta que se detecte el sensor de posicion
+		while(!EDG_SENSOR_POSICION());
+		//Cuando se detecta el sensor se sabe que el carrusel esta abajo y se inicia de nuevo a agitar
+		EDG_RELE_ELEVAR_INACTIVO();
+		EDG_RELE_AGITAR_ACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 50, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+#if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Posicion de agitar...\r\n", hedgRTC.CurrentDate.Hour,
+																							  hedgRTC.CurrentDate.Minute,
+																							  hedgRTC.CurrentDate.Second,
+																							  hedgRTC.CurrentDate.Day,
+																							  hedgRTC.CurrentDate.Month,
+																							  hedgRTC.CurrentDate.Year);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+#endif
+		//Se espera el tiempo de agitacion programado por el ciclo
+		HAL_Delay(10000);
+
+		/*
+		HAL_GPIO_WritePin(RELE_MANUAL_GPIO_Port, RELE_MANUAL_Pin, GPIO_PIN_SET);
+
+		if(!HAL_GPIO_ReadPin(SENSOR_AC_GPIO_Port, SENSOR_AC_Pin))
+		{
+			sprintf((char *)stringDebug, "Sensor AC activo!!!\r\n");
+		}
+		else
+		{
+			sprintf((char *)stringDebug, "Sensor AC inactivo...\r\n");
+		}
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+
+		if(!HAL_GPIO_ReadPin(SENSOR_FIN_GPIO_Port, SENSOR_FIN_Pin))
+		{
+			sprintf((char *)stringDebug, "Sensor Fin activo!!!\r\n");
+		}
+		else
+		{
+			sprintf((char *)stringDebug, "Sensor Fin inactivo...\r\n");
+		}
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+
+		HAL_GPIO_TogglePin(RELE_MANUAL_GPIO_Port, RELE_MANUAL_Pin);
+		HAL_GPIO_TogglePin(RELE_START_GPIO_Port, RELE_START_Pin);
+
+		HAL_Delay(2000);
+		*/
+
 	}
 
 	return;
@@ -656,7 +866,7 @@ void EDG_STATE_MACHINE_ChangePage(void)
 {
 
 	EDG_NEXTION_ChangePage(&hedgNextion, (EDG_NEXTION_PageTypeDef)hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
-	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_CONFIG)
+	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 	{
 		EDG_STATE_MACHINE_SetConfigPage();
 	}
@@ -1259,4 +1469,58 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 //	}
 
 	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_Manual(void)
+{
+	//Bajar carrusel
+	if(tempVal == 0)
+	{
+		EDG_RELE_ELEVAR_ACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 50);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+		//Se espera hasta que se detecte el sensor de posicion
+		while(!EDG_SENSOR_POSICION());
+		//Cuando se detecta el sensor se sabe que el carrusel esta abajo y se inicia de nuevo a agitar
+		EDG_RELE_ELEVAR_INACTIVO();
+		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ABAJO\"");
+		EDG_NEXTION_SendFrame(&hedgNextion);
+	}
+	//Subir carrusel
+	else if(tempVal == 1)
+	{
+
+		EDG_RELE_ELEVAR_ACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 50, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+		//Se espera un proceso de no sensado de carrusel y uno de sensado para
+		//saber que el carrusel esta arriba
+		while(!EDG_SENSOR_CARRUSEL());
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		while(EDG_SENSOR_CARRUSEL());
+		//Cuando el carrusel esta arriba se inactiva el rele de elevar
+		EDG_RELE_ELEVAR_INACTIVO();
+		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
+		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 0);
+		EDG_WS2812_SendSpi(&hedgWs2812);
+		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ARRIBA\"");
+		EDG_NEXTION_SendFrame(&hedgNextion);
+	}
+
+	sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"vis b0,1");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
+	EDG_NEXTION_EnableTouch(&hedgNextion);
+	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
+	return;
+
 }

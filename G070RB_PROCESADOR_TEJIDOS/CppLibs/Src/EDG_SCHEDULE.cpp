@@ -115,7 +115,7 @@ void EDG_SCHEDULE_CheckActive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
 				ptrhedgSchedule->ActiveStatus = EDG_SCHEDULE_STATUS_APPLIDED;
 				HAL_Delay(50);
 				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
-				EDG_STATE_MACHINE_SetConfigPage();
+				EDG_STATE_MACHINE_SetExecutePage();
 				EDG_STATE_MACHINE_ShowDate();
 
 			}
@@ -158,7 +158,7 @@ void EDG_SCHEDULE_CheckInactive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
 				ptrhedgSchedule->InactiveStatus = EDG_SCHEDULE_STATUS_APPLIDED;
 				HAL_Delay(50);
 				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
-				EDG_STATE_MACHINE_SetConfigPage();
+				EDG_STATE_MACHINE_SetExecutePage();
 				EDG_STATE_MACHINE_ShowDate();
 			}
 			/* Se verifica si el tiempo es menor al de la hora de activacion */

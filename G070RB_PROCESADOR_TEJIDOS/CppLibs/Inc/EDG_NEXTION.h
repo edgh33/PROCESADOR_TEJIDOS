@@ -40,14 +40,23 @@ extern "C" {
 #define EDG_NEXTION_BRIGHT_LEVEL_NORMAL	(100)
 #define EDG_NEXTION_BRIGHT_LEVEL_LOW	(10)
 
-#define EDG_NEXTION_FRAME_SIZE 			(100)
+#define EDG_NEXTION_FRAME_SIZE 			(200)
 #define EDG_NEXTION_RX_TIME_OUT_MS		(10)
 #define EDG_NEXTION_TX_TIME_OUT_MS		(100)
 #define EDG_NEXTION_DELAY_MS			(5)
+#define	EDG_NEXTION_MAX_DATA_RECEIVED   (40)
 #define EDG_NEXTION_FRAME_START_CHAR	('#')
+
+//Common array positions
 #define EDG_NEXTION_POS_COMMAND			(0)
 #define EDG_NEXTION_POS_PAGE			(1)
-#define	EDG_NEXTION_MAX_DATA_RECEIVED   (20)
+#define EDG_NEXTION_POS_WEEK_DAY		(1)
+#define EDG_NEXTION_POS_PROGRAM			(1)
+#define EDG_NEXTION_POS_DRIP_SECONDS	(25)
+#define EDG_NEXTION_POS_T1_STATE		(26)
+#define EDG_NEXTION_POS_T1_VALUE		(27)
+#define EDG_NEXTION_POS_T2_STATE		(28)
+#define EDG_NEXTION_POS_T2_VALUE		(29)
 
 
 /**
@@ -74,8 +83,8 @@ typedef enum
 	EDG_NEXTION_PAGE_CLOCK,
 	EDG_NEXTION_PAGE_SCHEDULE,
 	EDG_NEXTION_PAGE_PROGRAM,
-	EDG_NEXTION_PAGE_ALARM,
 	EDG_NEXTION_PAGE_OFFSET,
+	EDG_NEXTION_PAGE_ALARM,
 	EDG_NEXTION_PAGE_LAST, /*** used for check a valid page ***/
 
 }EDG_NEXTION_PageTypeDef;
@@ -101,6 +110,8 @@ typedef enum
 	EDG_NEXTION_COMMAND_OFFSET, /* (13/05/23) comando agregado para configurar offset */
 	EDG_NEXTION_COMMAND_MANUAL_MODE,
 	EDG_NEXTION_COMMAND_SAVE_PROGRAM,
+	EDG_NEXTION_COMMAND_RESUME_PROCESS,
+	EDG_NEXTION_COMMAND_RESTART_MEMORY,
 	EDG_NEXTION_COMMAND_NONE, /*** used as default value command ***/
 	EDG_NEXTION_COMMAND_LAST, /*** used for check a valid command ***/
 
@@ -191,7 +202,6 @@ EDG_NEXTION_StatusTypeDef EDG_NEXTION_ReceiveFrame(EDG_NEXTION_HandleTypeDef * p
 EDG_NEXTION_StatusTypeDef EDG_NEXTION_SendFrame(EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
 EDG_NEXTION_StatusTypeDef EDG_NEXTION_GetAllDataReceived(EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
 
-uint32_t EDG_NEXTION_GetDataFromFrame(EDG_NEXTION_HandleTypeDef * ptrhedgNextion, uint32_t Pos);
 EDG_NEXTION_PageTypeDef EDG_NEXTION_GetCurrentePage(EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
 void EDG_NEXTION_EnableTouch(EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
 void EDG_NEXTION_DisableTouch(EDG_NEXTION_HandleTypeDef * ptrhedgNextion);

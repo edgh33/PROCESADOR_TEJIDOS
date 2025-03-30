@@ -18,9 +18,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	if(huart->Instance == EDG_NEXTION_USART_PORT)
 	{
-
 		hedgNextion.RxFrameStatus = EDG_NEXTION_RX_FRAME_STATUS_INCOMING_FRAME;
-
 	}
 
 	return;

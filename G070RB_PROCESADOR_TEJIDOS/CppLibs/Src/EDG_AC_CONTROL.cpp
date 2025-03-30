@@ -649,12 +649,12 @@ void EDG_AC_CONTROL_CheckOffsetValues(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAcco
 void EDG_AC_CONTROL_LoadOffsetValues(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol)
 {
 
-	uint8_t Temp[EDG_MEM_ADDR_OFFSET_QTY] = {0};
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {0};
 
 	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
 						     EDG_MEM_ADDR_BASE_OFFSET,
 							 Temp,
-							 EDG_MEM_ADDR_OFFSET_QTY) == EDG_MEMORY_STATE_OK)
+							 EDG_MEM_ADDR_VALUES_X_OFFSET) == EDG_MEMORY_STATE_OK)
 	{
 		for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 		{

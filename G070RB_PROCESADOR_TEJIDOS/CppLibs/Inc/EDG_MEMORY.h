@@ -26,8 +26,8 @@ extern "C" {
 
 #define	EDG_MEMORY_I2C_PORT			I2C1	//Puerto I2C
 #define EDG_MEMORY_I2C_HANDLER		hi2c1
-#define EDG_MEMORY_TIMEOUT_MS		(100)
-#define EDG_MEMORY_WAIT_TIME_MS		(8)
+#define EDG_MEMORY_TIMEOUT_MS		(500)
+#define EDG_MEMORY_WAIT_TIME_MS		(10)
 
 #define EDG_MEMORY_ADDRESS_MEM1		(0x50)
 

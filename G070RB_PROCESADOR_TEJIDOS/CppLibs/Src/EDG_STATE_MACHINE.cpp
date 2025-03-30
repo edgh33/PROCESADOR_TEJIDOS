@@ -176,9 +176,12 @@ void EDG_STATE_MACHINE_InitState(void)
 	if(hedgAccontrol.AlarmStatus == EDG_AC_CONTROL_ALARM_STATUS_INACTIVE)
 	{
 
-		EDG_SCHEDULE_Init(&hedgSchedule, &hedgRTC);
-		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
-		EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
+		//REVISAR EL INICIO DEL CALENDARIO!!!!!
+		//TENER PRESENTE QUE EL CALENDARIO SE DEBE REVISAR CONSTANTEMENTE
+		//ACA SE DEBE REVISAR TAMBIEN SI HAY PROCESO ACTIVO
+//		EDG_SCHEDULE_Init(&hedgSchedule, &hedgRTC);
+//		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
+//		EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 
 		sprintf((char *)hedgNextion.TxFrame, "j0.val=100");
 		EDG_NEXTION_SendFrame(&hedgNextion);
@@ -330,7 +333,7 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 				/*** Come back from alarm ***/
 				EDG_AC_CONTROL_CloseAcRelay();
 				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
-				EDG_STATE_MACHINE_SetConfigPage();
+				EDG_STATE_MACHINE_SetExecutePage();
 				EDG_BUZZER_SetMode(&hedgBuzzer, EDG_BUZZER_MODE_ONE_PULSE);
 
 			}
@@ -338,7 +341,7 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 			{
 				if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 				{
-					EDG_STATE_MACHINE_RefreshConfigPage();
+					EDG_STATE_MACHINE_RefreshExecutePage();
 				}
 			}
 			EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
@@ -383,7 +386,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_LOAD_PROGRAM_VALUES:
 
-			//EDG_STATE_MACHINE_ChangeTemperature();
+			EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PROGRAM] - 1);//Minus 1 because data received is from 1 to 10
 
 			break;
 
@@ -404,21 +407,21 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_SET_TEMPERATURE:
 
-			//EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
+			//EDG_STATE_MACHINE_ChangeTemperature();
 
 			break;
 
 		case EDG_NEXTION_COMMAND_RUN_PROCESS:
 
-			//EDG_STATE_MACHINE_SaveProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
 
 			break;
 
 		case EDG_NEXTION_COMMAND_SAVE_SCHEDULE:
 
-			/*
-			EDG_STATE_MACHINE_SaveScheduleValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
+
+			EDG_STATE_MACHINE_SaveScheduleValues(hedgNextion.DataReceived[EDG_NEXTION_POS_WEEK_DAY]);
 			EDG_STATE_MACHINE_LoadScheduleValues();
+			/*
 			EDG_SCHEDULE_GetScheduleToday(&hedgSchedule, &hedgRTC);
 			EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 			EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
@@ -460,6 +463,18 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_SAVE_PROGRAM:
 
+			EDG_STATE_MACHINE_SaveProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PROGRAM] - 1); //Minus 1 because data received is from 1 to 10
+
+			break;
+
+		case EDG_NEXTION_COMMAND_RESUME_PROCESS:
+
+			break;
+
+		case EDG_NEXTION_COMMAND_RESTART_MEMORY:
+
+			EDG_STATE_MACHINE_CommandResetMemory();
+
 			break;
 
 		default:
@@ -474,6 +489,13 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 	if(NextState == EDG_STATE_MACHINE_STATE_IDLE)
 	{
 		EDG_NEXTION_EnableTouch(&hedgNextion);
+	}
+	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
+	{
+		sprintf((char *)hedgNextion.TxFrame,"tsw bt20,0");
+		EDG_NEXTION_SendFrame(&hedgNextion);
+		sprintf((char *)hedgNextion.TxFrame,"tsw bt21,0");
+		EDG_NEXTION_SendFrame(&hedgNextion);
 	}
 	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	/*** Change to the respective state  ***/
@@ -868,7 +890,7 @@ void EDG_STATE_MACHINE_ChangePage(void)
 	EDG_NEXTION_ChangePage(&hedgNextion, (EDG_NEXTION_PageTypeDef)hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
 	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 	{
-		EDG_STATE_MACHINE_SetConfigPage();
+		EDG_STATE_MACHINE_SetExecutePage();
 	}
 	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_PROGRAM)
 	{
@@ -936,12 +958,14 @@ void EDG_STATE_MACHINE_SetDate(void)
 
 	if(EDG_RTC_SetDate(&hedgRTC, EDG_RTC_ADDRESS) == EDG_RTC_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"Hora guardada correctamente!!!\"");
+		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"HORA GUARDADA CORRECTAMENTE!!!\"");
 	}
 	else
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"Error al guardar hora...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"ERROR AL GUARDAR HORA...\"");
 	}
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"timReloj.en=1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
 	return;
@@ -978,49 +1002,11 @@ void EDG_STATE_MACHINE_ShowDate(void)
   * @param
   * @retval
   */
-void EDG_STATE_MACHINE_SetConfigPage(void)
+void EDG_STATE_MACHINE_SetExecutePage(void)
 {
 
-	uint8_t Counter;
-
-	for(Counter = 0; Counter < hedgAccontrol.UnitsQty; Counter++)
-	{
-
-		if(hedgAccontrol.Units[Counter].SensorStatus == EDG_AC_CONTROL_SENSOR_STATUS_OK)
-		{
-			sprintf((char *)hedgNextion.TxFrame, "sl%d.val=%d", Counter, (int)hedgAccontrol.Units[Counter].Pid.SetPoint);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "tset%d.val=%d", Counter, (int)hedgAccontrol.Units[Counter].Pid.SetPoint);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "temp%d.val=%d", Counter, (int)hedgAccontrol.Units[Counter].Pid.SetPoint);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-
-		}
-		else
-		{
-			sprintf((char *)hedgNextion.TxFrame, "sl%d.val=%d", Counter, 0);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "bar%d.val=%d", Counter, 0);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-
-			sprintf((char *)hedgNextion.TxFrame, "vis sl%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "vis bar%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "vis bup%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "vis bdw%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "vis tset%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "vis tcur%d,0", Counter);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-
-		}
-
-	}
-
-	EDG_STATE_MACHINE_RefreshConfigPage();
+	EDG_STATE_MACHINE_LoadProgramValues(0);
+	EDG_STATE_MACHINE_RefreshExecutePage();
 	return;
 
 }
@@ -1030,24 +1016,8 @@ void EDG_STATE_MACHINE_SetConfigPage(void)
   * @param
   * @retval
   */
-void EDG_STATE_MACHINE_RefreshConfigPage(void)
+void EDG_STATE_MACHINE_RefreshExecutePage(void)
 {
-
-	uint8_t Counter;
-
-	for(Counter = 0; Counter < hedgAccontrol.UnitsQty; Counter++)
-	{
-
-		if(hedgAccontrol.Units[Counter].SensorStatus == EDG_AC_CONTROL_SENSOR_STATUS_OK)
-		{
-			/* (13/05/2023) Se ajusta para mostrar el valor real, se suma el offset*/
-			sprintf((char *)hedgNextion.TxFrame, "bar%d.val=%d", Counter, (int)(hedgAccontrol.Units[Counter].Pid.CurrentValue + hedgAccontrol.Units[Counter].Pid.Offset));
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame, "tcur%d.val=%d", Counter, (int)(hedgAccontrol.Units[Counter].Pid.CurrentValue + hedgAccontrol.Units[Counter].Pid.Offset));
-			EDG_NEXTION_SendFrame(&hedgNextion);
-		}
-
-	}
 
 	return;
 
@@ -1073,54 +1043,156 @@ void EDG_STATE_MACHINE_ChangeTemperature(void)
   */
 void EDG_STATE_MACHINE_CheckMemory(void)
 {
-	uint8_t Temp[10] = {0};
-	uint8_t Counter;
+	uint8_t Temp = 0;
+
 
 	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
 						  	 EDG_MEM_ADDR_BASE_PROGRAM,
-							 Temp,
+							 &Temp,
 							 1) == EDG_MEMORY_STATE_OK)
 	{
-		if(Temp[0] == 0xFF)
+		if(Temp == 0xFF)
 		{
-			for(Counter = 0; Counter < EDG_MEM_ADDR_VALUES_X_PROGRAM; Counter++)
-			{
-				Temp[Counter] = 60;
-			}
-
-			for(Counter = 0; Counter < EDG_MEM_ADDR_PROGRAM_QTY; Counter++)
-			{
-				EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
-									   (EDG_MEM_ADDR_BASE_PROGRAM + (EDG_MEM_ADDR_PROGRAM_OFFSET * Counter)),
-									   Temp,
-									   EDG_MEM_ADDR_VALUES_X_PROGRAM);
-			}
+			EDG_STATE_MACHINE_ResetProgramMemory();
 		}
 
 	}
-
 	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
 						  	 EDG_MEM_ADDR_BASE_SCHEDULE,
-							 Temp,
+							 &Temp,
 							 1) == EDG_MEMORY_STATE_OK)
 	{
-		if(Temp[0] == 0xFF)
+		if(Temp == 0xFF)
 		{
-			Temp[0] = 0; Temp[1] = 6; Temp[2] = 0; Temp[3] = 0;
-			Temp[4] = 6; Temp[5] = 0; Temp[6] = 1; Temp[7] = 0;
-
-			for(Counter = 0; Counter < EDG_MEM_ADDR_SCHEDULE_QTY; Counter++)
-			{
-				EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
-									   (EDG_MEM_ADDR_BASE_SCHEDULE + (EDG_MEM_ADDR_SCHEDULE_OFFSET * Counter)),
-									   Temp,
-									   EDG_MEM_ADDR_VALUES_X_SCHEDULE);
-			}
+			EDG_STATE_MACHINE_ResetScheduleMemory();
 		}
-
+	}
+	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
+							 EDG_MEM_ADDR_BASE_OFFSET,
+							 &Temp,
+							 1) == EDG_MEMORY_STATE_OK)
+	{
+		if(Temp == 0xFF)
+		{
+			EDG_STATE_MACHINE_ResetOffsetMemory();
+		}
+	}
+	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
+							 EDG_MEM_ADDR_BASE_CURR_PROC,
+							 &Temp,
+							 1) == EDG_MEMORY_STATE_OK)
+	{
+		if(Temp == 0xFF)
+		{
+			EDG_STATE_MACHINE_ResetCurrentProcessMemory();
+		}
 	}
 	return;
 
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_ResetProgramMemory(void)
+{
+	//Array with default program values, 12 containers active, 0 hours 15 minutes for each containers, 60 seconds for drip, T1 inactive, 60° t1, T2 inactive, 60° t2
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_PROGRAM] = {12, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 0, 15, 60, 0, 60, 0, 60};
+	uint8_t Counter;
+
+	for(Counter = 0; Counter < EDG_MEM_ADDR_PROGRAM_QTY; Counter++)
+	{
+		EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+							   (EDG_MEM_ADDR_BASE_PROGRAM + (EDG_MEM_ADDR_PROGRAM_OFFSET * Counter)),
+							   Temp,
+							   EDG_MEM_ADDR_VALUES_X_PROGRAM);
+	}
+	return;
+
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_ResetScheduleMemory(void)
+{
+	//Array with default schedule values, inactive 0, hour 8, minutes 0, am 0, program 1
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_SCHEDULE] = {0, 8, 0, 0, 1};
+	uint8_t Counter;
+
+	for(Counter = 0; Counter < EDG_MEM_ADDR_SCHEDULE_QTY; Counter++)
+	{
+		EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+							   (EDG_MEM_ADDR_BASE_SCHEDULE + (EDG_MEM_ADDR_SCHEDULE_OFFSET * Counter)),
+							   Temp,
+							   EDG_MEM_ADDR_VALUES_X_SCHEDULE);
+	}
+	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_ResetOffsetMemory(void)
+{
+	//Array with default offset values 5
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {5, 5, 5, 5, 5, 5};
+	uint8_t Counter;
+
+	for(Counter = 0; Counter < EDG_MEM_ADDR_OFFSET_QTY; Counter++)
+	{
+		EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+							   (EDG_MEM_ADDR_BASE_OFFSET + (EDG_MEM_ADDR_OFFSET_OFFSET * Counter)),
+							   Temp,
+							   EDG_MEM_ADDR_VALUES_X_OFFSET);
+	}
+	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_ResetCurrentProcessMemory(void)
+{
+	//Array with default program values, 12 containers active, 10 minutes 0 seconds for each containers, 60 seconds for drip, T1 inactive, 60° t1, T2 inactive, 60° t2
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_CURRENT_PROC] = {0};
+	uint8_t Counter;
+
+	for(Counter = 0; Counter < EDG_MEM_ADDR_CURR_PROC_QTY; Counter++)
+	{
+		EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+							   (EDG_MEM_ADDR_BASE_CURR_PROC + (EDG_MEM_ADDR_CURR_PROC_OFFSET * Counter)),
+							   Temp,
+							   EDG_MEM_ADDR_VALUES_X_CURRENT_PROC);
+	}
+	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_CommandResetMemory(void)
+{
+	EDG_STATE_MACHINE_ResetProgramMemory();
+	EDG_STATE_MACHINE_ResetScheduleMemory();
+	EDG_STATE_MACHINE_ResetCurrentProcessMemory();
+	EDG_STATE_MACHINE_ResetOffsetMemory();
+	EDG_STATE_MACHINE_LoadOffsetValues();
+	sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"MEMORIA REINICIADA!!!\"");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"timReloj.en=1");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	return;
 }
 
 /**
@@ -1144,12 +1216,15 @@ void EDG_STATE_MACHINE_SaveProgramValues(uint32_t Program)
 							  Temp,
 							  EDG_MEM_ADDR_VALUES_X_PROGRAM) == EDG_MEMORY_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   Programa    guardado!!!\"");
+		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   PROGRAMA       GUARDADO!!!\"");
 	}
 	else
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  Error al     guardar el    programa...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR AL GUARDAR EL PROGRAMA...\"");
 	}
+
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"tm0.en=1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
 	return;
@@ -1171,24 +1246,40 @@ void EDG_STATE_MACHINE_LoadProgramValues(uint32_t Program)
 							 Temp,
 							 EDG_MEM_ADDR_VALUES_X_PROGRAM) != EDG_MEMORY_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   Error al       cargar      programa...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   ERROR      CARGANDO\"");
 		EDG_NEXTION_SendFrame(&hedgNextion);
 		return;
 	}
 
-	for(Counter = 0; Counter < EDG_MEM_ADDR_VALUES_X_PROGRAM; Counter++)
+	//Load minutes and seconds
+	for(Counter = 0; Counter < 24; Counter++)
 	{
-
-		sprintf((char *)hedgNextion.TxFrame,"h%d.val=%d", Counter, Temp[Counter]);
+		sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", Counter, Temp[Counter+1]);
 		EDG_NEXTION_SendFrame(&hedgNextion);
-		sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", Counter, Temp[Counter]);
-		EDG_NEXTION_SendFrame(&hedgNextion);
-		sprintf((char *)hedgNextion.TxFrame,"temp%d.val=%d", Counter, Temp[Counter]);
-		EDG_NEXTION_SendFrame(&hedgNextion);
-
 	}
 
+	sprintf((char *)hedgNextion.TxFrame,"n31.val=%d", Temp[EDG_NEXTION_POS_DRIP_SECONDS]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"escu.val=%d", Temp[EDG_NEXTION_POS_DRIP_SECONDS]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
+	sprintf((char *)hedgNextion.TxFrame,"bt20.val=%d", Temp[EDG_NEXTION_POS_T1_STATE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"n25.val=%d", Temp[EDG_NEXTION_POS_T1_VALUE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"temp1.val=%d", Temp[EDG_NEXTION_POS_T1_VALUE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
+	sprintf((char *)hedgNextion.TxFrame,"bt21.val=%d", Temp[EDG_NEXTION_POS_T2_STATE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"n26.val=%d", Temp[EDG_NEXTION_POS_T2_VALUE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"temp2.val=%d", Temp[EDG_NEXTION_POS_T2_VALUE]);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
+
 	return;
+
 }
 
 /**
@@ -1215,11 +1306,11 @@ void EDG_STATE_MACHINE_SaveScheduleValues(uint32_t Day)
 								  Temp,
 								  EDG_MEM_ADDR_VALUES_X_SCHEDULE) == EDG_MEMORY_STATE_OK)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\" Dia configurado    como activo!!!\"");
+			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"   DIA CONFIGURADO        COMO ACTIVO!!!\"");
 		}
 		else
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\" Error al activar     el dia...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"   ERROR AL ACTIVAR         EL DIA...\"");
 		}
 
 
@@ -1232,15 +1323,18 @@ void EDG_STATE_MACHINE_SaveScheduleValues(uint32_t Day)
 								  &Temp[0],
 								  1) == EDG_MEMORY_STATE_OK)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"  Dia configurado  como inactivo!!!\"");
+			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"   DIA CONFIGURADO       COMO INACTIVO!!!\"");
 		}
 		else
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"     Error al        inactivar el         dia...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"  ERROR AL INACTIVAR         EL DIA...\"");
 		}
 	}
 
 	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"timCalen.en=1");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
 	return;
 }
 
@@ -1264,7 +1358,7 @@ void EDG_STATE_MACHINE_LoadScheduleValues(void)
 								 Temp,
 								 EDG_MEM_ADDR_VALUES_X_SCHEDULE) != EDG_MEMORY_STATE_OK)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"Error al leer calendario...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"    ERROR AL LEER        EL CALENDARIO...\"");
 			EDG_NEXTION_SendFrame(&hedgNextion);
 			return;
 		}
@@ -1290,17 +1384,7 @@ void EDG_STATE_MACHINE_LoadScheduleValues(void)
 		}
 		EDG_NEXTION_SendFrame(&hedgNextion);
 
-		if(Temp[6] == 0)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"ha%d.txt=\"%02d:%02dam\"", Counter, Temp[4], Temp[5]);
-		}
-		else
-		{
-			sprintf((char *)hedgNextion.TxFrame,"ha%d.txt=\"%02d:%02dpm\"", Counter, Temp[4], Temp[5]);
-		}
-		EDG_NEXTION_SendFrame(&hedgNextion);
-
-		sprintf((char *)hedgNextion.TxFrame,"pg%d.txt=\"%d\"", Counter, Temp[7] + 1);
+		sprintf((char *)hedgNextion.TxFrame,"pg%d.txt=\"%d\"", Counter, Temp[4]);
 		EDG_NEXTION_SendFrame(&hedgNextion);
 
 	}
@@ -1316,10 +1400,10 @@ void EDG_STATE_MACHINE_LoadScheduleValues(void)
 void EDG_STATE_MACHINE_SaveOffsetValues(void)
 {
 
-	uint8_t Temp[EDG_MEM_ADDR_OFFSET_QTY] = {0};
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {0};
 	uint8_t Counter;
 
-	for(Counter = 0; Counter < EDG_MEM_ADDR_OFFSET_QTY; Counter++)
+	for(Counter = 0; Counter < EDG_MEM_ADDR_VALUES_X_OFFSET; Counter++)
 	{
 		Temp[Counter] = (uint8_t)hedgNextion.DataReceived[Counter+1];
 	}
@@ -1327,14 +1411,16 @@ void EDG_STATE_MACHINE_SaveOffsetValues(void)
 	if(EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
 							  EDG_MEM_ADDR_BASE_OFFSET,
 							  Temp,
-							  EDG_MEM_ADDR_OFFSET_QTY) == EDG_MEMORY_STATE_OK)
+							  EDG_MEM_ADDR_VALUES_X_OFFSET) == EDG_MEMORY_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"Valores de offset guardados!!!\"");
+		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"VALORES DE OFFSET GUARDADOS!!!\"");
 	}
 	else
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"Error al guardar valores de    offset...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"     ERROR AL GUARDAR LOS           VALORES DE OFFSET...\"");
 	}
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"timReloj.en=1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
 	return;
@@ -1348,21 +1434,21 @@ void EDG_STATE_MACHINE_SaveOffsetValues(void)
 void EDG_STATE_MACHINE_LoadOffsetValues(void)
 {
 
-	uint8_t Temp[EDG_MEM_ADDR_OFFSET_QTY] = {0};
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {0};
 	uint8_t Counter;
 
 	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
 						     EDG_MEM_ADDR_BASE_OFFSET,
 							 Temp,
-							 EDG_MEM_ADDR_OFFSET_QTY) != EDG_MEMORY_STATE_OK)
+							 EDG_MEM_ADDR_VALUES_X_OFFSET) != EDG_MEMORY_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"Error al cargar valores de     offset...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t5.txt=\"     ERROR AL CARGAR LOS            VALORES DE OFFSET...\"");
 		EDG_NEXTION_SendFrame(&hedgNextion);
 		return;
 	}
 	else
 	{
-		for(Counter = 0; Counter < EDG_MEM_ADDR_OFFSET_QTY; Counter++)
+		for(Counter = 0; Counter < EDG_MEM_ADDR_VALUES_X_OFFSET; Counter++)
 		{
 			sprintf((char *)hedgNextion.TxFrame,"of%d.val=%d", Counter, Temp[Counter]);
 			EDG_NEXTION_SendFrame(&hedgNextion);
@@ -1418,7 +1504,7 @@ void EDG_STATE_MACHINE_CheckButtonSchedule(void)
 							 &Temp,
 							 1) != EDG_MEMORY_STATE_OK)
 	{
-		sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"Error al leer calendario...\"");
+		sprintf((char *)hedgNextion.TxFrame,"t39.txt=\"    ERROR AL LEER        EL CALENDARIO...\"");
 		EDG_NEXTION_SendFrame(&hedgNextion);
 		return;
 	}
@@ -1517,6 +1603,8 @@ void EDG_STATE_MACHINE_Manual(void)
 	sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 	sprintf((char *)hedgNextion.TxFrame,"vis b0,1");
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	sprintf((char *)hedgNextion.TxFrame,"vis b1,1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
 	EDG_NEXTION_EnableTouch(&hedgNextion);

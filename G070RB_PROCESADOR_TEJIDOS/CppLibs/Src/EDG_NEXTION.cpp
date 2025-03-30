@@ -124,7 +124,7 @@ EDG_NEXTION_StatusTypeDef EDG_NEXTION_ReceiveFrame(EDG_NEXTION_HandleTypeDef * p
 				pbuffer_rx++;
 			}
 
-		}while(*CheckPtr != 0x0D);
+		}while((*CheckPtr != 0x0D) && (FlagError == 0));
 
 		pbuffer_rx--;
 		*pbuffer_rx = 0;
@@ -224,42 +224,6 @@ EDG_NEXTION_StatusTypeDef EDG_NEXTION_GetAllDataReceived(EDG_NEXTION_HandleTypeD
 
 	ptrhedgNextion->CommandReceived = (EDG_NEXTION_CommandTypeDef)ptrhedgNextion->DataReceived[EDG_NEXTION_POS_COMMAND];
 	return EDG_NEXTION_STATUS_OK;
-}
-/**
-  * @brief
-  * @param
-  * @retval
-  */
-uint32_t EDG_NEXTION_GetDataFromFrame(EDG_NEXTION_HandleTypeDef * ptrhedgNextion, uint32_t Pos)
-{
-
-	static uint8_t FrameData[10];
-	uint8_t * TempPtr = ptrhedgNextion->RxFrame;
-	uint32_t PosCounter = 0;
-	uint8_t * TempFrameData = FrameData;
-
-	memset(FrameData, 0, sizeof(FrameData));
-
-	while(PosCounter < Pos)
-	{
-		if(*TempPtr == ':')
-		{
-			PosCounter++;
-		}
-		TempPtr++;
-	}
-
-	while((*TempPtr != ':') && (*TempPtr != 0))
-	{
-		*TempFrameData = *TempPtr;
-		TempFrameData++;
-		TempPtr++;
-	}
-
-	*TempFrameData = 0;
-
-	return (uint32_t)atoi((char *)FrameData);
-
 }
 
 /**

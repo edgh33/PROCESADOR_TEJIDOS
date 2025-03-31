@@ -89,6 +89,7 @@ typedef struct __EDG_STATE_MACHINE_HandleTypeDef
 
 	EDG_STATE_MACHINE_StateTypeDef CurrentState;
 	EDG_STATE_MACHINE_StateTypeDef PastState;
+	uint8_t TempValuint8;
 
 }EDG_STATE_MACHINE_HandleTypeDef;
 
@@ -104,6 +105,7 @@ void EDG_STATE_MACHINE_Admin(EDG_STATE_MACHINE_HandleTypeDef * ptrhedgStateMachi
 void EDG_STATE_MACHINE_InitState(void);
 void EDG_STATE_MACHINE_IdleState(void);
 void EDG_STATE_MACHINE_TemperatureControlState(void);
+void EDG_STATE_MACHINE_Process(void);
 void EDG_STATE_MACHINE_ExecCommandState(void);
 void EDG_STATE_MACHINE_AlarmState(void);
 void EDG_STATE_MACHINE_TestState(void);
@@ -140,6 +142,7 @@ void EDG_STATE_MACHINE_CheckButtonSchedule(void);
 void EDG_STATE_MACHINE_CheckButtonBuzzer(void);
 
 void EDG_STATE_MACHINE_Manual(void);
+uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void);
 
 
 #ifdef __cplusplus

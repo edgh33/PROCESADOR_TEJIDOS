@@ -20,7 +20,7 @@ extern "C" {
 
 #define EDG_MEM_ADDR_PROGRAM_QTY			(10U)
 #define EDG_MEM_ADDR_POS_X_PROGRAM_VALUE	(1U)
-#define EDG_MEM_ADDR_VALUES_X_PROGRAM		(30U) //Active container (1), Hours and minutes by container (12*2), drip seconds (1), t1 state (1), t1 value (1), t2 state (1), t2 value (1)
+#define EDG_MEM_ADDR_VALUES_X_PROGRAM		(30U) //Active containers (1), Hours and minutes by container (12*2), drip seconds (1), t1 state (1), t1 value (1), t2 state (1), t2 value (1)
 #define EDG_MEM_ADDR_PROGRAM_OFFSET			(EDG_MEM_ADDR_POS_X_PROGRAM_VALUE * EDG_MEM_ADDR_VALUES_X_PROGRAM)
 #define EDG_MEM_ADDR_PROGRAM_TOTAL_SIZE		(EDG_MEM_ADDR_PROGRAM_QTY * EDG_MEM_ADDR_PROGRAM_OFFSET)
 
@@ -38,8 +38,8 @@ extern "C" {
 
 #define EDG_MEM_ADDR_CURR_PROC_QTY			(1U)
 #define EDG_MEM_ADDR_POS_X_CURRENT_PROC  	(1U)
-#define EDG_MEM_ADDR_VALUES_X_CURRENT_PROC	(34U) //Hours and minutes by container (12*2), drip seconds (1), t1 state (1), t1 value (1), t2 state (1), t2 value (1),
-												  //current contaniner(1), carousel pos(1), delay hour(1), delay min(1), active run? (1)
+#define EDG_MEM_ADDR_VALUES_X_CURRENT_PROC	(36U) //Active containers (1), Hours and minutes by container (12*2), drip seconds (1), t1 state (1), t1 value (1), t2 state (1), t2 value (1),
+												  //current contaniner(1), carousel pos(1), delay hour(1), delay min(1), program (1), active run? (1)
 #define EDG_MEM_ADDR_CURR_PROC_OFFSET		(EDG_MEM_ADDR_POS_X_CURRENT_PROC * EDG_MEM_ADDR_VALUES_X_CURRENT_PROC)
 #define EDG_MEM_ADDR_CURR_PROC_TOTAL_SIZE 	(EDG_MEM_ADDR_CURR_PROC_QTY * EDG_MEM_ADDR_CURR_PROC_OFFSET)
 

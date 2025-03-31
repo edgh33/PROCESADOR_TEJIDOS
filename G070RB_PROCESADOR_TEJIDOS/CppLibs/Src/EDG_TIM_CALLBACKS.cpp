@@ -19,7 +19,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if(htim->Instance == EDG_TIMER_TIM_BASE)
 	{
-;
+
 		hedgTimer.FlagsStatus.Flag1s = true;
 		hedgTimer.CounterSegs++;
 		hedgTimer.CounterBaseTimeSecs1++;
@@ -54,7 +54,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		hedgNextion.Bright.Status = EDG_NEXTION_BRIGHT_STATUS_LOW;
 	}
-
+	else if(htim->Instance == EDG_PROCESSOR_TIM)
+	{
+		hedgProcessor.FlagsStatus.FlagTimComplete = 1;
+	}
 	return;
 }
 

@@ -13,7 +13,6 @@ EDG_STATE_MACHINE_HandleTypeDef hedgStateMachine;
 
 #if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
 uint8_t stringDebug[200] = {0};
-uint8_t tempVal = 0;
 #endif
 
 /* State Machine Functions -------------------------------------*/
@@ -27,6 +26,8 @@ void EDG_STATE_MACHINE_Init(EDG_STATE_MACHINE_HandleTypeDef * ptrhedgStateMachin
 {
 	ptrhedgStateMachine->CurrentState = EDG_STATE_MACHINE_STATE_INIT;
 	ptrhedgStateMachine->PastState = EDG_STATE_MACHINE_STATE_INIT;
+	ptrhedgStateMachine->TempValuint8 = 0;
+	return;
 }
 
 /**
@@ -78,7 +79,7 @@ void EDG_STATE_MACHINE_Admin(EDG_STATE_MACHINE_HandleTypeDef * ptrhedgStateMachi
 
 		case EDG_STATE_MACHINE_STATE_PROCESS:
 
-
+			EDG_STATE_MACHINE_Process();
 			break;
 
 		case EDG_STATE_MACHINE_STATE_MANUAL:
@@ -169,6 +170,7 @@ void EDG_STATE_MACHINE_InitState(void)
 	EDG_NEXTION_SendFrame(&hedgNextion);
 	HAL_Delay(1000);
 
+	EDG_PROCESSOR_Init(&hedgProcessor);
 	EDG_AC_CONTROL_Init(&hedgAccontrol, &hedgMAX6675);
 	/*** Set the leds in the right color ***/
 	EDG_STATE_MACHINE_SetLedColors();
@@ -274,6 +276,12 @@ void EDG_STATE_MACHINE_IdleState(void)
 
 	}
 
+	if(hedgProcessor.FlagsStatus.FlagTimComplete && hedgProcessor.FlagsStatus.FlagRunning)
+	{
+		EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_PROCESS);
+		return;
+	}
+
 	if(hedgTimer.FlagsStatus.FlagBaseTimeSecs1 == true)
 	{
 		hedgTimer.FlagsStatus.FlagBaseTimeSecs1 = false;
@@ -297,10 +305,10 @@ void EDG_STATE_MACHINE_IdleState(void)
 		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 		EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 	}
+
 	if(hedgTimer.FlagsStatus.Flag1h == true)
 	{
 		hedgTimer.FlagsStatus.Flag1h = false;
-
 	}
 
 /* MAIN LOOP END ----------------------------------------------------------------------------------------*/
@@ -368,6 +376,259 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
   * @param
   * @retval
   */
+void EDG_STATE_MACHINE_Process(void)
+{
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_PROGRAM] = {0};
+	uint8_t Counter;
+
+	//Check if the SetRunning flag is set for load the program values
+	if(hedgProcessor.FlagsStatus.FlagSetRunning)
+	{
+		//Read the values of the program
+		if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
+								 (EDG_MEM_ADDR_BASE_PROGRAM + (EDG_MEM_ADDR_PROGRAM_OFFSET * hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM])),
+								 Temp,
+								 EDG_MEM_ADDR_VALUES_X_PROGRAM) != EDG_MEMORY_STATE_OK)
+		{
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   ERROR      CARGANDO\"");
+			EDG_NEXTION_SendFrame(&hedgNextion);
+			hedgProcessor.FlagsStatus.FlagError = 1;
+			return;
+		}
+		else
+		{
+			//Load the values of hours and minutes into the CurrentProcess array
+			for(Counter = 0; Counter < 24; Counter++)
+			{
+				hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + Counter] = Temp[1 + Counter];
+			}
+			//Load the value of active containers
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS] = Temp[0];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] = 0;
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_UNKNOW;
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_IS_ACTIVE] = 1; //Flag that check is there is a process running!!!
+
+			//Save the current process in memory
+			if(!EDG_STATE_MACHINE_SaveCurrentProcess())
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   ERROR      GUARDANDO\"");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				hedgProcessor.FlagsStatus.FlagError = 1;
+				return;
+			}
+			else
+			{
+
+				//TODO!!! Add routine for temperature control!!!
+				hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1] * 60) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + 1];
+				hedgProcessor.TotalTimeDelayMinutes = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] * 60) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN];
+				if(hedgProcessor.TotalTimeDelayMinutes > 0)
+				{
+					hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_DELAY;
+					sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  PROGRAMA   EN RETARDO\"");
+					EDG_NEXTION_SendFrame(&hedgNextion);
+					//Start Tim for 60 seconds
+					EDG_PROCESSOR_StartTim(&hedgProcessor, 60);
+				}
+				else
+				{
+					hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_CHECK_CAROUSEL;
+					hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+					sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
+					EDG_NEXTION_SendFrame(&hedgNextion);
+				}
+				//Set the flag for start de process
+				hedgProcessor.FlagsStatus.FlagRunning = 1;
+			}
+		}
+		//Clear the flag for start de process
+		hedgProcessor.FlagsStatus.FlagSetRunning = 0;
+	}
+
+	if(hedgProcessor.FlagsStatus.FlagRunning)
+	{
+		switch (hedgProcessor.CurrentState)
+		{
+
+			case EDG_PROCESSOR_STATE_STOP:
+
+				  //t0.txt="  PROGRAMA    DETENIDO"
+
+					break;
+
+			case EDG_PROCESSOR_STATE_DELAY:
+
+				if(hedgProcessor.FlagsStatus.FlagTimComplete)
+				{
+					hedgProcessor.FlagsStatus.FlagTimComplete = 0;
+
+					hedgProcessor.TotalTimeDelayMinutes--;
+					if(hedgProcessor.TotalTimeDelayMinutes > 0)
+					{
+						if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN] == 0)
+						{
+							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN] = 59;
+							if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] > 0)
+							{
+								hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR]--;
+							}
+						}
+						else
+						{
+							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN]--;
+						}
+						sprintf((char *)hedgNextion.TxFrame,"n27.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR]);
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						sprintf((char *)hedgNextion.TxFrame,"n28.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN]);
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+					else
+					{
+						hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN] = 0;
+						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+						hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_CHECK_CAROUSEL;
+						hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+						sprintf((char *)hedgNextion.TxFrame,"n28.val=0");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+					EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+				}
+
+				break;
+
+			case EDG_PROCESSOR_STATE_CHECK_CAROUSEL:
+
+				if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] == EDG_PROCESSOR_CAROUSEL_UNKNOW)
+				{
+
+					if(!EDG_PROCESSOR_SENSOR_POSITION() && !hedgProcessor.FlagsStatus.FlagCheckCarousel)
+					{
+						EDG_PROCESSOR_RAISE_RELAY_ACTIVE();
+						hedgProcessor.FlagsStatus.FlagCheckCarousel = 1;
+						hedgProcessor.CounterCheckCarousel = 0;
+						HAL_Delay(500);
+						EDG_PROCESSOR_StopTim(&hedgProcessor);
+						EDG_PROCESSOR_StartTimMs(&hedgProcessor, 200);
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  UBICANDO    CARRUSEL\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+					else if(EDG_PROCESSOR_SENSOR_POSITION() && !hedgProcessor.FlagsStatus.FlagCheckCarousel)
+					{
+						EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
+						hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
+						hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_DOWN;
+						hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_RUNNING;
+						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+						EDG_PROCESSOR_StopTim(&hedgProcessor);
+						//Start Tim for 60 seconds
+						EDG_PROCESSOR_StartTim(&hedgProcessor, 60);
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+					else if(hedgProcessor.FlagsStatus.FlagCheckCarousel
+							&& hedgProcessor.FlagsStatus.FlagTimComplete
+							&& (hedgProcessor.CounterCheckCarousel < 300) //30 seconds
+							)
+					{
+						hedgProcessor.FlagsStatus.FlagTimComplete = 0;
+						hedgProcessor.CounterCheckCarousel++;
+						if(EDG_PROCESSOR_SENSOR_POSITION())
+						{
+							EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
+							hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
+							hedgProcessor.CounterCheckCarousel = 0;
+							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_DOWN;
+							EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_RUNNING;
+							EDG_PROCESSOR_StopTim(&hedgProcessor);
+							//Start Tim for 60 seconds
+							EDG_PROCESSOR_StartTim(&hedgProcessor, 60);
+							sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
+							EDG_NEXTION_SendFrame(&hedgNextion);
+						}
+					}
+					if(hedgProcessor.CounterCheckCarousel >= 300)
+					{
+						hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_ALERT;
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\" ERROR CON    CARRUSEL\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+				}
+
+				break;
+
+			case EDG_PROCESSOR_STATE_RUNNING:
+
+				if(hedgProcessor.FlagsStatus.FlagTimComplete)
+				{
+					hedgProcessor.FlagsStatus.FlagTimComplete = 0;
+
+					hedgProcessor.TotalTimeCurrenteContainer--;
+					if(hedgProcessor.TotalTimeCurrenteContainer > 0)
+					{
+						//Index for hour
+						hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
+						if(hedgProcessor.CurrentProcess[hedgProcessor.Index + 1] == 0) //Container Minute is +1
+						{
+							hedgProcessor.CurrentProcess[hedgProcessor.Index + 1] = 59; //Container Minute is +1
+							if(hedgProcessor.CurrentProcess[hedgProcessor.Index] > 0) //Container Hour
+							{
+								hedgProcessor.CurrentProcess[hedgProcessor.Index]--;
+							}
+						}
+						else
+						{
+							hedgProcessor.CurrentProcess[hedgProcessor.Index + 1]--;
+						}
+						sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2),
+																		  hedgProcessor.CurrentProcess[hedgProcessor.Index]);
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", ((hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2) + 1),
+																		  hedgProcessor.CurrentProcess[hedgProcessor.Index + 1]);
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+					}
+					else
+					{
+						hedgProcessor.CurrentProcess[hedgProcessor.Index + 1] = 0; // minute equals to cero
+						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+						hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_CHECK_CAROUSEL;
+						hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+						sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", ((hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2) + 1),
+																		    hedgProcessor.CurrentProcess[hedgProcessor.Index + 1]);
+						EDG_NEXTION_SendFrame(&hedgNextion);
+					}
+				}
+
+				break;
+
+			case EDG_PROCESSOR_STATE_ROTATING:
+
+				break;
+
+			case EDG_PROCESSOR_STATE_PAUSE:
+
+				break;
+
+			case EDG_PROCESSOR_STATE_ALERT:
+
+				break;
+
+			default:
+				break;
+		}
+	}
+
+	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
+
+	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
 void EDG_STATE_MACHINE_ExecCommandState(void)
 {
 	EDG_STATE_MACHINE_StateTypeDef NextState = EDG_STATE_MACHINE_STATE_IDLE;
@@ -413,6 +674,19 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_RUN_PROCESS:
 
+			//all the values of the process are load into the array
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] = hedgNextion.DataReceived[1] - 1; //Minus 1 because program comes from 1 to 10
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] = hedgNextion.DataReceived[2];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN] = hedgNextion.DataReceived[3];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DRIP_SECONDS] = hedgNextion.DataReceived[4];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_T1_STATE] = hedgNextion.DataReceived[5];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_T1_VALUE] = hedgNextion.DataReceived[6];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_T2_STATE] = hedgNextion.DataReceived[7];
+			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_T2_VALUE] = hedgNextion.DataReceived[8];
+			//The flag of set the process is set and the next state is load
+			hedgProcessor.FlagsStatus.FlagSetRunning = 1;
+
+			NextState = EDG_STATE_MACHINE_STATE_PROCESS;
 
 			break;
 
@@ -457,7 +731,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_MANUAL_MODE:
 
-			tempVal = hedgNextion.DataReceived[1];
+			hedgStateMachine.TempValuint8 = hedgNextion.DataReceived[1];
 			NextState = EDG_STATE_MACHINE_STATE_MANUAL;
 			break;
 
@@ -489,13 +763,6 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 	if(NextState == EDG_STATE_MACHINE_STATE_IDLE)
 	{
 		EDG_NEXTION_EnableTouch(&hedgNextion);
-	}
-	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
-	{
-		sprintf((char *)hedgNextion.TxFrame,"tsw bt20,0");
-		EDG_NEXTION_SendFrame(&hedgNextion);
-		sprintf((char *)hedgNextion.TxFrame,"tsw bt21,0");
-		EDG_NEXTION_SendFrame(&hedgNextion);
 	}
 	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	/*** Change to the respective state  ***/
@@ -1162,7 +1429,7 @@ void EDG_STATE_MACHINE_ResetOffsetMemory(void)
   */
 void EDG_STATE_MACHINE_ResetCurrentProcessMemory(void)
 {
-	//Array with default program values, 12 containers active, 10 minutes 0 seconds for each containers, 60 seconds for drip, T1 inactive, 60° t1, T2 inactive, 60° t2
+
 	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_CURRENT_PROC] = {0};
 	uint8_t Counter;
 
@@ -1565,7 +1832,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 void EDG_STATE_MACHINE_Manual(void)
 {
 	//Bajar carrusel
-	if(tempVal == 0)
+	if(hedgStateMachine.TempValuint8 == 0)
 	{
 		EDG_RELE_ELEVAR_ACTIVO();
 		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
@@ -1579,7 +1846,7 @@ void EDG_STATE_MACHINE_Manual(void)
 		EDG_NEXTION_SendFrame(&hedgNextion);
 	}
 	//Subir carrusel
-	else if(tempVal == 1)
+	else if(hedgStateMachine.TempValuint8 == 1)
 	{
 
 		EDG_RELE_ELEVAR_ACTIVO();
@@ -1604,7 +1871,7 @@ void EDG_STATE_MACHINE_Manual(void)
 	EDG_NEXTION_SendFrame(&hedgNextion);
 	sprintf((char *)hedgNextion.TxFrame,"vis b0,1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
-	sprintf((char *)hedgNextion.TxFrame,"vis b1,1");
+	sprintf((char *)hedgNextion.TxFrame,"vis bt1,1");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
 	EDG_NEXTION_EnableTouch(&hedgNextion);
@@ -1612,3 +1879,23 @@ void EDG_STATE_MACHINE_Manual(void)
 	return;
 
 }
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void)
+{
+	if(EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+						      (EDG_MEM_ADDR_BASE_CURR_PROC),
+							  hedgProcessor.CurrentProcess,
+							  EDG_MEM_ADDR_VALUES_X_CURRENT_PROC) != EDG_MEMORY_STATE_OK)
+	{
+		return 0;
+	}else
+	{
+		return 1;
+	}
+}
+

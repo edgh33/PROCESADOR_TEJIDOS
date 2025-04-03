@@ -282,6 +282,12 @@ void EDG_STATE_MACHINE_IdleState(void)
 		return;
 	}
 
+	if(hedgProcessor.FlagsStatus.FlagTimComplete && hedgProcessor.FlagsStatus.FlagManual)
+	{
+		EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_MANUAL);
+		return;
+	}
+
 	if(hedgTimer.FlagsStatus.FlagBaseTimeSecs1 == true)
 	{
 		hedgTimer.FlagsStatus.FlagBaseTimeSecs1 = false;
@@ -747,7 +753,6 @@ void EDG_STATE_MACHINE_Process(void)
 						hedgProcessor.CounterCheckCarousel++;
 						if(EDG_PROCESSOR_SENSOR_POSITION() && !EDG_SENSOR_CARRUSEL())
 						{
-
 							EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
 							EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
 							HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
@@ -816,6 +821,186 @@ void EDG_STATE_MACHINE_Process(void)
 	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
 
 	return;
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
+void EDG_STATE_MACHINE_Manual(void)
+{
+	if(hedgProcessor.FlagsStatus.FlagSetManual)
+	{
+		hedgProcessor.FlagsStatus.FlagSetManual = 0;
+		hedgProcessor.FlagsStatus.FlagManual = 1;
+		hedgProcessor.ManualState = (EDG_PROCESSOR_ManualState)hedgStateMachine.TempValuint8;
+
+		switch(hedgProcessor.ManualState)
+		{
+
+			case EDG_PROCESSOR_MANUAL_STATE_DOWN:
+
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"BAJANDO CARRUSEL\"");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				EDG_PROCESSOR_RAISE_RELAY_ACTIVE();
+				EDG_WS2812_Pixel(&hedgWs2812, 5, 50, 0, 50);
+				EDG_WS2812_SendSpi(&hedgWs2812);
+				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+				EDG_PROCESSOR_StopTim(&hedgProcessor);
+				EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_CHECK_TIME_MS); //The tim starts for 200ms checking of carousel position
+
+				break;
+
+			case EDG_PROCESSOR_MANUAL_STATE_RAISE:
+
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"SUBIENDO CARRUSEL\"");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				EDG_PROCESSOR_RAISE_RELAY_ACTIVE();
+				EDG_WS2812_Pixel(&hedgWs2812, 5, 50, 50, 0);
+				EDG_WS2812_SendSpi(&hedgWs2812);
+				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+				hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
+				EDG_PROCESSOR_StopTim(&hedgProcessor);
+				EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_CHECK_TIME_MS); //The tim starts for 200ms checking of carousel position
+
+				break;
+
+			case EDG_PROCESSOR_MANUAL_STATE_SHAKE:
+			case EDG_PROCESSOR_MANUAL_STATE_NO_SHAKE:
+
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+				break;
+
+			default:
+				break;
+		}
+
+	}
+
+	if(hedgProcessor.FlagsStatus.FlagTimComplete)
+	{
+		hedgProcessor.FlagsStatus.FlagTimComplete = 0;
+
+		switch(hedgProcessor.ManualState)
+		{
+			//Down Carousel
+			case EDG_PROCESSOR_MANUAL_STATE_DOWN:
+
+				hedgProcessor.CounterCheckCarousel++;
+				if(EDG_PROCESSOR_SENSOR_POSITION() && !EDG_SENSOR_CARRUSEL())
+				{
+					EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
+					HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+					sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ABAJO\"");
+					EDG_NEXTION_SendFrame(&hedgNextion);
+					hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_DOWN;
+					hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+					EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+					hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+					hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+				}
+				else if(hedgProcessor.CounterCheckCarousel >= EDG_PROCESSOR_MAX_CHECKS_ROTATING)
+				{
+					sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR POS 4\"");
+					EDG_NEXTION_SendFrame(&hedgNextion);
+					//what to do if carousel is not in the right position???
+					hedgProcessor.CounterCheckCarousel = 0;
+				}
+
+				break;
+
+			//Up carousel
+			case EDG_PROCESSOR_MANUAL_STATE_RAISE:
+
+				if(!hedgProcessor.FlagsStatus.FlagCheckCarousel)
+				{
+					hedgProcessor.CounterCheckCarousel++;
+					if(EDG_PROCESSOR_SENSOR_CAROUSEL())
+					{
+						hedgProcessor.CounterCheckCarousel = 0;
+						hedgProcessor.FlagsStatus.FlagCheckCarousel = 1;
+
+					}
+					else if(hedgProcessor.CounterCheckCarousel >= EDG_PROCESSOR_MAX_CHECKS_ROTATING)
+					{
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR POS 2\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						//what to do if carousel is not in the right position???
+						hedgProcessor.CounterCheckCarousel = 0;
+					}
+				}
+				else
+				{
+					hedgProcessor.CounterCheckCarousel++;
+					if(!EDG_PROCESSOR_SENSOR_CAROUSEL())
+					{
+						EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
+						hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
+						hedgProcessor.CounterCheckCarousel = 0;
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ARRIBA\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_UP;
+						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
+						HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+						hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+						hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+
+					}
+					else if(hedgProcessor.CounterCheckCarousel >= EDG_PROCESSOR_MAX_CHECKS_ROTATING)
+					{
+						sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR POS 3\"");
+						EDG_NEXTION_SendFrame(&hedgNextion);
+						//what to do if carousel is not in the right position???
+						hedgProcessor.CounterCheckCarousel = 0;
+					}
+
+				}
+
+				break;
+
+			case EDG_PROCESSOR_MANUAL_STATE_SHAKE:
+
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"AGITANDO\"");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
+				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+				hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+
+				break;
+
+			case EDG_PROCESSOR_MANUAL_STATE_NO_SHAKE:
+
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"AGITADO DETENIDO\"");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				EDG_PROCESSOR_SHAKE_RELAY_INACTIVE();
+				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+				hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+
+				break;
+
+			case EDG_PROCESSOR_MANUAL_STATE_FINISH:
+
+				sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				sprintf((char *)hedgNextion.TxFrame,"vis b0,1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				sprintf((char *)hedgNextion.TxFrame,"vis bt1,1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+
+				hedgProcessor.FlagsStatus.FlagManual = 0;
+				EDG_PROCESSOR_StopTim(&hedgProcessor);
+				EDG_NEXTION_EnableTouch(&hedgNextion);
+				EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
+
+				break;
+		}
+	}
+
+	return;
+
 }
 
 /**
@@ -929,6 +1114,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 		case EDG_NEXTION_COMMAND_MANUAL_MODE:
 
 			hedgStateMachine.TempValuint8 = hedgNextion.DataReceived[1];
+			hedgProcessor.FlagsStatus.FlagSetManual = 1;
 			NextState = EDG_STATE_MACHINE_STATE_MANUAL;
 			break;
 
@@ -957,10 +1143,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 	EDG_NEXTION_SetCurrentBright(&hedgNextion);
 	EDG_NEXTION_RestartBrightTim(&hedgNextion);
 	EDG_NEXTION_StartReceiveFrame(&hedgNextion);
-	if(NextState == EDG_STATE_MACHINE_STATE_IDLE)
-	{
-		EDG_NEXTION_EnableTouch(&hedgNextion);
-	}
+	EDG_NEXTION_EnableTouch(&hedgNextion);
 	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 	/*** Change to the respective state  ***/
 	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, NextState);
@@ -2021,61 +2204,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	return;
 }
 
-/**
-  * @brief
-  * @param
-  * @retval
-  */
-void EDG_STATE_MACHINE_Manual(void)
-{
-	//Bajar carrusel
-	if(hedgStateMachine.TempValuint8 == 0)
-	{
-		EDG_RELE_ELEVAR_ACTIVO();
-		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
-		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 50);
-		EDG_WS2812_SendSpi(&hedgWs2812);
-		//Se espera hasta que se detecte el sensor de posicion
-		while(!EDG_SENSOR_POSICION());
-		//Cuando se detecta el sensor se sabe que el carrusel esta abajo y se inicia de nuevo a agitar
-		EDG_RELE_ELEVAR_INACTIVO();
-		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ABAJO\"");
-		EDG_NEXTION_SendFrame(&hedgNextion);
-	}
-	//Subir carrusel
-	else if(hedgStateMachine.TempValuint8 == 1)
-	{
 
-		EDG_RELE_ELEVAR_ACTIVO();
-		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
-		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 50, 0);
-		EDG_WS2812_SendSpi(&hedgWs2812);
-		//Se espera un proceso de no sensado de carrusel y uno de sensado para
-		//saber que el carrusel esta arriba
-		while(!EDG_SENSOR_CARRUSEL());
-		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
-		while(EDG_SENSOR_CARRUSEL());
-		//Cuando el carrusel esta arriba se inactiva el rele de elevar
-		EDG_RELE_ELEVAR_INACTIVO();
-		HAL_Delay(500); //Se coloca delay como antirrebote pero es mejor mirar otra opcion
-		EDG_WS2812_Pixel(&hedgWs2812, 0, 50, 0, 0);
-		EDG_WS2812_SendSpi(&hedgWs2812);
-		sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"CARRUSEL ARRIBA\"");
-		EDG_NEXTION_SendFrame(&hedgNextion);
-	}
-
-	sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
-	EDG_NEXTION_SendFrame(&hedgNextion);
-	sprintf((char *)hedgNextion.TxFrame,"vis b0,1");
-	EDG_NEXTION_SendFrame(&hedgNextion);
-	sprintf((char *)hedgNextion.TxFrame,"vis bt1,1");
-	EDG_NEXTION_SendFrame(&hedgNextion);
-
-	EDG_NEXTION_EnableTouch(&hedgNextion);
-	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
-	return;
-
-}
 
 /**
   * @brief

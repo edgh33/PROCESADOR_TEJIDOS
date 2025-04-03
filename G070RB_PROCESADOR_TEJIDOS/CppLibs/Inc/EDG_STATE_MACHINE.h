@@ -106,6 +106,7 @@ void EDG_STATE_MACHINE_InitState(void);
 void EDG_STATE_MACHINE_IdleState(void);
 void EDG_STATE_MACHINE_TemperatureControlState(void);
 void EDG_STATE_MACHINE_Process(void);
+void EDG_STATE_MACHINE_Manual(void);
 void EDG_STATE_MACHINE_ExecCommandState(void);
 void EDG_STATE_MACHINE_AlarmState(void);
 void EDG_STATE_MACHINE_TestState(void);
@@ -141,7 +142,7 @@ void EDG_STATE_MACHINE_BrightSave(void);
 void EDG_STATE_MACHINE_CheckButtonSchedule(void);
 void EDG_STATE_MACHINE_CheckButtonBuzzer(void);
 
-void EDG_STATE_MACHINE_Manual(void);
+
 uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void);
 
 

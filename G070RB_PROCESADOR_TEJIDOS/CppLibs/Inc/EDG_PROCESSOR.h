@@ -78,6 +78,8 @@ typedef union
 		uint8_t FlagRunning		:1;
 		uint8_t FlagError 		:1;
 		uint8_t FlagCheckCarousel :1;
+		uint8_t FlagSetManual   :1;
+		uint8_t FlagManual 		:1;
 
 	};
 }EDG_PROCESSOR_FlagsStatusTypeDef;
@@ -127,12 +129,28 @@ typedef enum
 /**
   * @brief Structure definition
   */
+typedef enum
+{
+
+	EDG_PROCESSOR_MANUAL_STATE_DOWN,
+	EDG_PROCESSOR_MANUAL_STATE_RAISE,
+	EDG_PROCESSOR_MANUAL_STATE_SHAKE,
+	EDG_PROCESSOR_MANUAL_STATE_NO_SHAKE,
+	EDG_PROCESSOR_MANUAL_STATE_FINISH,
+
+}EDG_PROCESSOR_ManualState;
+
+
+/**
+  * @brief Structure definition
+  */
 typedef struct __EDG_PROCESSOR_HandleTypeDef
 {
 
 	EDG_PROCESSOR_FlagsStatusTypeDef FlagsStatus;
 	EDG_PROCESSOR_States CurrentState;
 	EDG_PROCESSOR_CarouselState CurrentCarouselState;
+	EDG_PROCESSOR_ManualState ManualState;
 	uint8_t CurrentProcess[EDG_PROCESSOR_CURR_STATE_ARRAY_SIZE];
 
 	uint8_t CurrentHour;

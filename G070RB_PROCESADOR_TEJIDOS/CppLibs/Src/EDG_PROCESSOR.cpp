@@ -22,6 +22,7 @@ void EDG_PROCESSOR_Init(EDG_PROCESSOR_HandleTypeDef * phedgProcessor)
 	phedgProcessor->FlagsStatus.AllFlags = 0x00;
 	phedgProcessor->CurrentState = EDG_PROCESSOR_STATE_STOP;
 	phedgProcessor->CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_CHECKING;
+	phedgProcessor->ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
 	memset(phedgProcessor->CurrentProcess, 0, EDG_PROCESSOR_CURR_STATE_ARRAY_SIZE);
 
 	phedgProcessor->CurrentHour = 0;

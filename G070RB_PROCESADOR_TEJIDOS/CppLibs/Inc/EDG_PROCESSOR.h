@@ -69,17 +69,18 @@ extern "C" {
 
 typedef union
 {
-	uint8_t AllFlags;
+	uint16_t AllFlags;
 	struct{
 
-		uint8_t FlagTimActive	:1;
-		uint8_t FlagTimComplete	:1;
-		uint8_t FlagSetRunning 	:1;
-		uint8_t FlagRunning		:1;
-		uint8_t FlagError 		:1;
-		uint8_t FlagCheckCarousel :1;
-		uint8_t FlagSetManual   :1;
-		uint8_t FlagManual 		:1;
+		uint16_t FlagTimActive		:1;
+		uint16_t FlagTimComplete	:1;
+		uint16_t FlagSetRunning 	:1;
+		uint16_t FlagRunning		:1;
+		uint16_t FlagError 			:1;
+		uint16_t FlagCheckCarousel 	:1;
+		uint16_t FlagSetManual   	:1;
+		uint16_t FlagManual 		:1;
+		uint16_t FlagResume 		:1;
 
 	};
 }EDG_PROCESSOR_FlagsStatusTypeDef;
@@ -92,7 +93,11 @@ typedef enum
 
 	EDG_PROCESSOR_CAROUSEL_POS_UNKNOW,
 	EDG_PROCESSOR_CAROUSEL_POS_DOWN,
+	EDG_PROCESSOR_CAROUSEL_POS_RAISING_1,
+	EDG_PROCESSOR_CAROUSEL_POS_RAISING_2,
 	EDG_PROCESSOR_CAROUSEL_POS_UP,
+	EDG_PROCESSOR_CAROUSEL_POS_WAITING,
+	EDG_PROCESSOR_CAROUSEL_POS_DESCENDING
 
 }EDG_PROCESSOR_CarouselPos;
 

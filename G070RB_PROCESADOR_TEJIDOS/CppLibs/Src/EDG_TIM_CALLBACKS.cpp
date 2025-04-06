@@ -58,6 +58,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		hedgProcessor.FlagsStatus.FlagTimComplete = 1;
 	}
+	else if(htim->Instance == EDG_BUZZER_TIM_BASE)
+	{
+		EDG_BUZZER_IrqFunction();
+	}
+
 	return;
 }
 

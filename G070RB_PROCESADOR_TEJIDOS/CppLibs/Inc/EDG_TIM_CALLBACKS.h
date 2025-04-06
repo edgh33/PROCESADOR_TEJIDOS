@@ -23,6 +23,7 @@ extern "C" {
 #endif
 
 /* Include the headers files  related with tim callbacks  ----------------------*/
+#include "EDG_BUZZER.h"
 #include "EDG_TIMER.h"
 #include "EDG_NEXTION.h"
 #include "EDG_PROCESSOR.h"

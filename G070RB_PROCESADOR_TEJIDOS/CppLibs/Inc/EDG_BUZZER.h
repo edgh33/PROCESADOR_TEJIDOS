@@ -27,53 +27,52 @@ extern "C" {
 
 #define EDG_BUZZER_TIM_BASE				TIM16
 #define EDG_BUZZER_TIM_BASE_HANDLER		htim16
-#define EDG_BUZZER_TIM_CHANNEL			TIM_CHANNEL_1
 
-#define EDG_BUZZER_PERIOD_ONE_PULSE			199
-#define EDG_BUZZER_PULSE_ONE_PULSE			169
+#define EDG_BUZZER_PIN_HIGH()		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET)
+#define EDG_BUZZER_PIN_LOW()		HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET)
 
-#define EDG_BUZZER_PERIOD_REPETITIVE		1999
-#define EDG_BUZZER_PULSE_REPETITIVE			999
-
-/**
-  * @brief RTC Date Structure definition
-  */
-typedef enum
+typedef union
 {
-	EDG_BUZZER_STATUS_INACTIVE,
-	EDG_BUZZER_STATUS_ACTIVE,
+	uint16_t AllFlags;
+	struct{
 
-}EDG_BUZZER_StatusTypeDef;
-
-/**
-  * @brief RTC Date Structure definition
-  */
-typedef enum
-{
-
-	EDG_BUZZER_MODE_ONE_PULSE,
-	EDG_BUZZER_MODE_REPETITIVE,
-
-}EDG_BUZZER_ModeTypeDef;
-
+		uint16_t FlagActive			:1;
+		uint16_t FlagIsHigh			:1;
+		uint16_t FlagHasDelay	 	:1;
+		uint16_t FlagTrigger		:1;
+		uint16_t FlagisFinite		:1;
+		uint16_t FlagSoundOn		:1;
+		uint16_t FlagError 			:1;
+	};
+}EDG_BUZZER_FlagsStatusTypeDef;
 
 /**
   * @brief Structure definition
   */
-typedef struct __EDG_BUZZER_HandleTypeDef
-{
+typedef struct __EDG_BUZZER_HandleTypeDef{
 
-	EDG_BUZZER_StatusTypeDef Status;
-	EDG_BUZZER_ModeTypeDef Mode;
+	EDG_BUZZER_FlagsStatusTypeDef FlagsStatus;
+	uint16_t period10msLow;
+	uint16_t period10msHigh;
+	uint16_t cicles;
+	uint16_t repeats;
+	uint16_t delay;
 
 }EDG_BUZZER_HandleTypeDef;
+
 
 extern EDG_BUZZER_HandleTypeDef hedgBuzzer;
 
 /* Timer Functions -------------------------------------*/
-void EDG_BUZZER_Init(EDG_BUZZER_HandleTypeDef * ptrhedgTimer);
-void EDG_BUZZER_Pulse(EDG_BUZZER_HandleTypeDef * ptrhedgBuzzer);
-void EDG_BUZZER_SetMode(EDG_BUZZER_HandleTypeDef * ptrhedgBuzzer, EDG_BUZZER_ModeTypeDef Mode);
+void EDG_BUZZER_Init(EDG_BUZZER_HandleTypeDef * hedgBuzzer);
+void EDG_BUZZER_Sound(uint16_t periodHigh10ms,
+					  uint16_t periodLow10ms,
+					  uint16_t delay10ms,
+					  uint16_t cicles,
+					  uint16_t repeats);
+void EDG_BUZZER_Constant(void);
+void EDG_BUZZER_Stop(void);
+void EDG_BUZZER_IrqFunction(void);
 
 
 #ifdef __cplusplus

@@ -119,7 +119,7 @@ void EDG_STATE_MACHINE_CheckRTC(void);
 void EDG_STATE_MACHINE_TestPwmOutput(void);
 void EDG_STATE_MACHINE_TestTempetatureChips(void);
 
-void EDG_STATE_MACHINE_ChangePage(void);
+void EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PageTypeDef page);
 void EDG_STATE_MACHINE_SetDate(void);
 void EDG_STATE_MACHINE_ShowDate(void);
 void EDG_STATE_MACHINE_SetExecutePage(void);
@@ -142,7 +142,8 @@ void EDG_STATE_MACHINE_BrightSave(void);
 void EDG_STATE_MACHINE_CheckButtonSchedule(void);
 void EDG_STATE_MACHINE_CheckButtonBuzzer(void);
 
-
+uint8_t EDG_STATE_MACHINE_CheckActiveProcess(void);
+void EDG_STATE_MACHINE_ResumeActiveProcess(void);
 uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void);
 
 

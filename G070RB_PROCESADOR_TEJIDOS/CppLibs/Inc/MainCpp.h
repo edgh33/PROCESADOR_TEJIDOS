@@ -21,6 +21,7 @@ extern "C" {
 #include "EDG_AC_CONTROL.h"
 #include "EDG_CONFIG.h"
 #include "EDG_MAX6675.h"
+#include "EDG_DS18B20.h"
 #include "EDG_MEMORY.h"
 #include "EDG_RTC.h"
 #include "EDG_TIM_CALLBACKS.h"

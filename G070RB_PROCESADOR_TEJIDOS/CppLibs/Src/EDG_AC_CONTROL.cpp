@@ -17,7 +17,7 @@ EDG_AC_CONTROL_HandleTypeDef hedgAccontrol;
   * @retval
   */
 void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						 EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675)
+						 EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20)
 {
 
 	/*** Set the qty of units to be controlled ***/
@@ -27,7 +27,7 @@ void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
 	ptrhedgAccontrol->SensorsInAlarm = 0x0000;
 
 	/*** Check the sensor status ***/
-	EDG_AC_CONTROL_CheckSensors(ptrhedgAccontrol, ptrhedgMAX6675);
+	EDG_AC_CONTROL_CheckSensors(ptrhedgAccontrol, ptrhedgDS18B20);
 
 	for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 	{
@@ -41,7 +41,7 @@ void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
 			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlType = EDG_AC_CONTROL_CONTROL_TYPE_PID;
 		}
 
-		/*** All the PÏD values are set no matter the sensor state or control type ***/
+		/*** All the PID values are set no matter the sensor state or control type ***/
 		switch(ptrhedgAccontrol->UnitsCounter)
 		{
 			case EDG_AC_CONTROL_CONTROL_LOAD_0:
@@ -94,7 +94,9 @@ void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
 		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.Error_0 = 0;
 		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.Error_Sum = 0;
 
+		//All controls start as inactive
 		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
+		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
 
 	}
 
@@ -122,26 +124,20 @@ void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
   * @retval
   */
 void EDG_AC_CONTROL_CheckSensors(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						         EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675)
+						         EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20)
 {
 
 	ptrhedgAccontrol->SensorsInAlarm = 0x0000;
-	/*** Read all the max6675 chips to check the thermocouple status ***/
-	EDG_MAX6675_ReadAllChips(ptrhedgMAX6675);
+	/*** Read all the DS18B20 chips to check the status ***/
+	EDG_DS18B20_ReadAllChipsTemperature(ptrhedgDS18B20);
 
 	for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 	{
-
 		/*** Check the status of each chip to set the values of each unit ***/
-		if(ptrhedgMAX6675->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus != EDG_MAX6675_CHIP_STATUS_OK)
+		if(ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus != EDG_DS18B20_STATUS_OK)
 		{
 			/*** If the chip is set as TC open then set the sensor status as not present ***/
-			if(ptrhedgMAX6675->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus == EDG_MAX6675_CHIP_STATUS_TC_OPEN)
-			{
-				ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_NOT_PRESENT;
-				ptrhedgAccontrol->SensorsInAlarm |= (1<< ptrhedgAccontrol->UnitsCounter);
-			}
-			else
+			if(ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus == EDG_DS18B20_STATUS_ERROR)
 			{
 				ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_ERROR;
 				ptrhedgAccontrol->SensorsInAlarm |= (1<< ptrhedgAccontrol->UnitsCounter);
@@ -165,8 +161,8 @@ void EDG_AC_CONTROL_CheckSensors(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol
 		{
 			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_OK;
 			/*** If the chip is right the control flag is active ***/
-			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE;
-			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = ptrhedgMAX6675->Chip[ptrhedgAccontrol->UnitsCounter].Temperature;
+			//ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE;
+			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].Temperature;
 		}
 	}
 
@@ -229,11 +225,11 @@ void EDG_AC_CONTROL_CheckAlarm(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol)
   * @retval
   */
 void EDG_AC_CONTROL_PerformAll(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						 	   EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675)
+						 	   EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20)
 {
 
 	/*** Chechk the sensors status and get the current values ***/
-	EDG_AC_CONTROL_CheckSensors(ptrhedgAccontrol, ptrhedgMAX6675);
+	EDG_AC_CONTROL_CheckSensors(ptrhedgAccontrol, ptrhedgDS18B20);
 
 	for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 	{
@@ -268,7 +264,6 @@ void EDG_AC_CONTROL_PerformPid(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol)
 	EDG_AC_CONTROL_Pid(&ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid);
 	/***After perform the PID calculation set the PWM output ***/
 	EDG_AC_CONTROL_SetPWMOutput(ptrhedgAccontrol, ptrhedgAccontrol->UnitsCounter, EDG_AC_CONTROL_PWMEcuation((ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.Control/EDG_AC_CONTROL_MAX_PWM) * 100));
-
 	return;
 
 }

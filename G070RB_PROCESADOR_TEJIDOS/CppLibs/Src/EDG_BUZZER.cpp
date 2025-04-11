@@ -64,6 +64,8 @@ void EDG_BUZZER_Sound(uint16_t periodHigh10ms,
         hedgBuzzer.FlagsStatus.FlagHasDelay = true;
      }
 
+     HAL_TIM_Base_Stop_IT(&EDG_BUZZER_TIM_BASE_HANDLER);
+	 __HAL_TIM_SET_COUNTER(&EDG_BUZZER_TIM_BASE_HANDLER, 0);
      HAL_TIM_Base_Start_IT(&EDG_BUZZER_TIM_BASE_HANDLER);
      EDG_BUZZER_PIN_HIGH();
      return;

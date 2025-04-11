@@ -81,6 +81,8 @@ typedef union
 		uint16_t FlagSetManual   	:1;
 		uint16_t FlagManual 		:1;
 		uint16_t FlagResume 		:1;
+		uint16_t FlagShaking		:1;
+		uint16_t FlagCarouselPos	:1;
 
 	};
 }EDG_PROCESSOR_FlagsStatusTypeDef;

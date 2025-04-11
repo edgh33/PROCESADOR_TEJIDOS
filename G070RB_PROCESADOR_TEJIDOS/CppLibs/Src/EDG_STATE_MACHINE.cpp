@@ -163,14 +163,15 @@ void EDG_STATE_MACHINE_InitState(void)
 	HAL_Delay(1000);
 
 	EDG_TIMER_Init(&hedgTimer);
-	EDG_MAX6675_Init(&hedgMAX6675);
+	//EDG_MAX6675_Init(&hedgMAX6675);
+	EDG_DS18B20_Init(&hedgDS18B20);
 
 	sprintf((char *)hedgNextion.TxFrame, "j0.val=75");
 	EDG_NEXTION_SendFrame(&hedgNextion);
 	HAL_Delay(1000);
 
 	EDG_PROCESSOR_Init(&hedgProcessor);
-	EDG_AC_CONTROL_Init(&hedgAccontrol, &hedgMAX6675);
+	EDG_AC_CONTROL_Init(&hedgAccontrol, &hedgDS18B20);
 	/*** Set the leds in the right color ***/
 	EDG_STATE_MACHINE_SetLedColors();
 
@@ -184,7 +185,7 @@ void EDG_STATE_MACHINE_InitState(void)
 //		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 //		EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 
-		EDG_BUZZER_Sound(10, 15, 0, 1, 3);
+		EDG_BUZZER_Sound(10, 15, 0, 1, 2);
 
 		sprintf((char *)hedgNextion.TxFrame, "j0.val=100");
 		EDG_NEXTION_SendFrame(&hedgNextion);
@@ -316,9 +317,9 @@ void EDG_STATE_MACHINE_IdleState(void)
 	{
 		hedgTimer.FlagsStatus.Flag1m = false;
 		EDG_STATE_MACHINE_ShowDate();
-		EDG_SCHEDULE_CheckChangeDay(&hedgSchedule, &hedgRTC);
-		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
-		EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
+		//EDG_SCHEDULE_CheckChangeDay(&hedgSchedule, &hedgRTC);
+		//EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
+		//EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 	}
 
 	if(hedgTimer.FlagsStatus.Flag1h == true)
@@ -341,7 +342,7 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 {
 
 		/*** Perform Control of all units ***/
-		EDG_AC_CONTROL_PerformAll(&hedgAccontrol, &hedgMAX6675);
+		EDG_AC_CONTROL_PerformAll(&hedgAccontrol, &hedgDS18B20);
 
 #if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
 		/*** Function that shows the current temperature value ***/
@@ -471,8 +472,8 @@ void EDG_STATE_MACHINE_Process(void)
 			//Set the flag for start de process
 			hedgProcessor.FlagsStatus.FlagRunning = 1;
 			//TODO!!! Add routine for temperature control!!!
-			hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + 1];
 			hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
+			hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
 			hedgProcessor.TotalTimeDelayMinutes = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN];
 			if(hedgProcessor.TotalTimeDelayMinutes > 0)
 			{
@@ -627,7 +628,8 @@ void EDG_STATE_MACHINE_Process(void)
 				sprintf((char *)hedgNextion.TxFrame,"vis b4,1");
 				EDG_NEXTION_SendFrame(&hedgNextion);
 				hedgProcessor.FlagsStatus.FlagRunning = 0;
-				EDG_STATE_MACHINE_LoadProgramValues(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM]);
+				hedgProcessor.FlagsStatus.FlagShaking = 0;
+				EDG_STATE_MACHINE_LoadProgramValues(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM], 0);
 				hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_IS_ACTIVE] = 0; //Flag that check is there is a process running!!!
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
 				EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
@@ -816,6 +818,7 @@ void EDG_STATE_MACHINE_Process(void)
 							EDG_NEXTION_SendFrame(&hedgNextion);
 							EDG_PROCESSOR_SHAKE_RELAY_INACTIVE();
 							HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+							hedgProcessor.FlagsStatus.FlagShaking = 0;
 							hedgProcessor.CounterCheckCarousel = 0;
 							//Check if Carousel is in the right position
 							if(EDG_PROCESSOR_SENSOR_POSITION() && !EDG_PROCESSOR_SENSOR_CAROUSEL())
@@ -868,6 +871,7 @@ void EDG_STATE_MACHINE_Process(void)
 									hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
 									hedgProcessor.CounterCheckCarousel = 0;
 									hedgProcessor.CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_WAITING;
+									hedgProcessor.FlagsStatus.FlagCarouselPos = 1;
 									sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ESCURRIENDO\"");
 									EDG_NEXTION_SendFrame(&hedgNextion);
 									hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_WAITING;
@@ -931,6 +935,8 @@ void EDG_STATE_MACHINE_Process(void)
 							EDG_NEXTION_SendFrame(&hedgNextion);
 							hedgProcessor.CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_CHECKING;
 							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_DOWN;
+							hedgProcessor.FlagsStatus.FlagCarouselPos = 0;
+							hedgProcessor.FlagsStatus.FlagShaking = 1;
 							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_RUNNING;
 							EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
 							EDG_PROCESSOR_StopTim(&hedgProcessor);
@@ -957,7 +963,7 @@ void EDG_STATE_MACHINE_Process(void)
 
 			case EDG_PROCESSOR_STATE_FINISH:
 
-				EDG_BUZZER_Sound(10, 10, 0, 1, 10);
+				EDG_BUZZER_Sound(50, 50, 100, 2, 10);
 				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  PROGRAMA   FINALIZADO\"");
 				EDG_NEXTION_SendFrame(&hedgNextion);
 				EDG_PROCESSOR_SHAKE_RELAY_INACTIVE();
@@ -967,7 +973,7 @@ void EDG_STATE_MACHINE_Process(void)
 				EDG_NEXTION_SendFrame(&hedgNextion);
 				sprintf((char *)hedgNextion.TxFrame,"vis b4,1");
 				EDG_NEXTION_SendFrame(&hedgNextion);
-
+				hedgProcessor.FlagsStatus.FlagShaking = 0;
 				hedgProcessor.FlagsStatus.FlagRunning = 0;
 				hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_IS_ACTIVE] = 0; //Flag that check is there is a process running!!!
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
@@ -1062,6 +1068,7 @@ void EDG_STATE_MACHINE_Manual(void)
 					hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
 					EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
 					hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+					hedgProcessor.FlagsStatus.FlagCarouselPos = 0;
 					hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
 				}
 				else if(hedgProcessor.CounterCheckCarousel >= EDG_PROCESSOR_MAX_CHECKS_ROTATING)
@@ -1108,7 +1115,9 @@ void EDG_STATE_MACHINE_Manual(void)
 						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
 						HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
 						hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
+						hedgProcessor.FlagsStatus.FlagCarouselPos = 1;
 						hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
+
 
 					}
 					else if(hedgProcessor.CounterCheckCarousel >= EDG_PROCESSOR_MAX_CHECKS_ROTATING)
@@ -1128,6 +1137,7 @@ void EDG_STATE_MACHINE_Manual(void)
 				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"AGITANDO\"");
 				EDG_NEXTION_SendFrame(&hedgNextion);
 				EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
+				hedgProcessor.FlagsStatus.FlagShaking = 1;
 				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
 				hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
 				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
@@ -1139,6 +1149,7 @@ void EDG_STATE_MACHINE_Manual(void)
 				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"AGITADO DETENIDO\"");
 				EDG_NEXTION_SendFrame(&hedgNextion);
 				EDG_PROCESSOR_SHAKE_RELAY_INACTIVE();
+				hedgProcessor.FlagsStatus.FlagShaking = 0;
 				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
 				hedgProcessor.ManualState = EDG_PROCESSOR_MANUAL_STATE_FINISH;
 				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
@@ -1193,7 +1204,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_LOAD_PROGRAM_VALUES:
 
-			EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PROGRAM] - 1);//Minus 1 because data received is from 1 to 10
+			EDG_STATE_MACHINE_LoadProgramValues(hedgNextion.DataReceived[EDG_NEXTION_POS_PROGRAM] - 1, hedgNextion.DataReceived[EDG_NEXTION_POS_SETTING_PROG]);//Minus 1 because data received is from 1 to 10
 
 			break;
 
@@ -1217,7 +1228,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 		case EDG_NEXTION_COMMAND_SET_TEMPERATURE:
 
-			//EDG_STATE_MACHINE_ChangeTemperature();
+			EDG_STATE_MACHINE_ChangeTemperature();
 
 			break;
 
@@ -1248,7 +1259,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 			EDG_SCHEDULE_GetScheduleToday(&hedgSchedule, &hedgRTC);
 			EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
 			EDG_SCHEDULE_CheckInactive(&hedgSchedule, &hedgRTC, &hedgAccontrol, &hedgNextion);
-			 */
+			*/
 			break;
 
 		case EDG_NEXTION_COMMAND_RESET:
@@ -1343,7 +1354,57 @@ void EDG_STATE_MACHINE_AlarmState(void)
   */
 void EDG_STATE_MACHINE_TestState(void)
 {
+	uint8_t Presence = 0;
+	uint16_t Temp_byte1 = 0;
+	uint16_t Temp_byte2 = 0;
+	uint16_t TEMP = 0;
+	float Temperature = 0.0;
+	uint8_t counter = 0;
 
+	while(1)
+	{
+		for(counter = 0; counter < 2; counter++)
+		{
+
+
+		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
+		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
+		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0x44);  // convert t
+
+		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
+		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
+		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xBE);  // Read Scratch-pad
+
+		Temp_byte1 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
+		Temp_byte2 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
+		TEMP = ((Temp_byte2<<8))|Temp_byte1;
+
+		Temperature = (float)((TEMP & 0x7FF) * 0.0625);
+		if((TEMP >> 11) & 0x1F)
+		{
+			Temperature *= -1;
+		}
+		//Temperature = (float)TEMP/16.0;  // resolution is 0.0625
+
+		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Temperatura Chip %d = %.02f, Presence = %d, %02X %02X\n", hedgRTC.CurrentDate.Hour,
+																							  hedgRTC.CurrentDate.Minute,
+																							  hedgRTC.CurrentDate.Second,
+																							  hedgRTC.CurrentDate.Day,
+																							  hedgRTC.CurrentDate.Month,
+																							  hedgRTC.CurrentDate.Year,
+																							  counter + 1,
+																							  Temperature,
+																							  Presence,
+																							  Temp_byte1,
+																							  Temp_byte2);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+
+		}
+		HAL_Delay(3000);
+	}
+
+	/*
 	EDG_WS2812_Pixel(&hedgWs2812, 0, 0, 0, 0);
 	EDG_WS2812_Pixel(&hedgWs2812, 1, 0, 0, 0);
 	EDG_WS2812_Pixel(&hedgWs2812, 2, 0, 0, 0);
@@ -1511,7 +1572,9 @@ void EDG_STATE_MACHINE_TestState(void)
 		//Se espera el tiempo de agitacion programado por el ciclo
 		HAL_Delay(10000);
 
-		/*
+
+
+
 		HAL_GPIO_WritePin(RELE_MANUAL_GPIO_Port, RELE_MANUAL_Pin, GPIO_PIN_SET);
 
 		if(!HAL_GPIO_ReadPin(SENSOR_AC_GPIO_Port, SENSOR_AC_Pin))
@@ -1538,9 +1601,9 @@ void EDG_STATE_MACHINE_TestState(void)
 		HAL_GPIO_TogglePin(RELE_START_GPIO_Port, RELE_START_Pin);
 
 		HAL_Delay(2000);
-		*/
 
-	}
+
+	}*/
 
 	return;
 }
@@ -1574,17 +1637,10 @@ void EDG_STATE_MACHINE_SetLedColors(void)
 
 				break;
 
-			case EDG_AC_CONTROL_SENSOR_STATUS_NOT_PRESENT:
-
-				/*** If sensor is not present the led is BLUE ***/
-				EDG_WS2812_Pixel(&hedgWs2812, (hedgAccontrol.UnitsQty - hedgAccontrol.UnitsCounter - 1) , 0, 0, 50);
-
-				break;
-
 			case EDG_AC_CONTROL_SENSOR_STATUS_ERROR:
 
-				/*** If sensor is in error led is YELLOW ***/
-				EDG_WS2812_Pixel(&hedgWs2812, (hedgAccontrol.UnitsQty - hedgAccontrol.UnitsCounter - 1) , 0, 50, 50);
+				/*** If sensor is in error led is BLUE ***/
+				EDG_WS2812_Pixel(&hedgWs2812, (hedgAccontrol.UnitsQty - hedgAccontrol.UnitsCounter - 1) , 0, 0, 50);
 
 				break;
 
@@ -1671,12 +1727,12 @@ void EDG_STATE_MACHINE_TestTempetatureChips(void)
 
 	uint8_t Counter;
 
-	EDG_MAX6675_ReadAllChips(&hedgMAX6675);
+	//EDG_DS18B20_ReadAllChipsTemperature(&hedgDS18B20);
 
 #if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
-	for(Counter = 0; Counter < hedgMAX6675.NumChipsEnabled; Counter++)
+	for(Counter = 0; Counter < hedgDS18B20.NumChipsEnabled; Counter++)
 	{
-		sprintf((char *)stringDebug, "%3.02f,", hedgMAX6675.Chip[Counter].Temperature);
+		sprintf((char *)stringDebug, "%3.02f,", hedgDS18B20.Chip[Counter].Temperature);
 		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
 	}
 	for(Counter = 0; Counter < hedgAccontrol.UnitsQty; Counter++)
@@ -1704,42 +1760,56 @@ void EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PageTypeDef page)
 	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 	{
 		EDG_STATE_MACHINE_SetExecutePage();
+		EDG_STATE_MACHINE_RefreshExecutePage();
 	}
 	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_PROGRAM)
 	{
-		EDG_STATE_MACHINE_LoadProgramValues(0);
+		EDG_STATE_MACHINE_LoadProgramValues(0, 0);
 	}
 	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_SCHEDULE)
 	{
 		EDG_STATE_MACHINE_LoadScheduleValues();
 		EDG_STATE_MACHINE_CheckButtonSchedule();
 	}
+	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_MANUAL)
+	{
+		if(hedgProcessor.FlagsStatus.FlagCarouselPos)
+		{
+			sprintf((char *)hedgNextion.TxFrame,"bt0.val=1");
+			EDG_NEXTION_SendFrame(&hedgNextion);
+		}
+		if(hedgProcessor.FlagsStatus.FlagShaking)
+		{
+			sprintf((char *)hedgNextion.TxFrame,"bt1.val=1");
+			EDG_NEXTION_SendFrame(&hedgNextion);
+		}
+	}
 	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_MENU)
 	{
 		if((hedgRTC.CurrentState != EDG_RTC_STATE_OK) && (hedgAccontrol.SensorsInAlarm != 0))
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"Error en el reloj y en uno   o varios sensores...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"        ERROR EN EL RELOJ Y EN                 UNO O VARIOS SENSORES...\"");
 		}
 		else if(hedgRTC.CurrentState != EDG_RTC_STATE_OK)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"Error en el reloj...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN EL RELOJ...\"");
 
 		}
 		else if((hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED) && (hedgAccontrol.SensorsInAlarm != 0))
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  Reloj desconfigurado y     error en uno o varios          sensores...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"     RELOJ DESCONFIGURADO Y ERROR EN            UNO O VARIOS SENSORES...\"");
 		}
 		else if(hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  Reloj desconfigurado...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"RELOJ DESCONFIGURADO...\"");
 		}
 		else if(hedgAccontrol.SensorsInAlarm != 0)
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"   Error en uno o varios          sensores...\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN UNO O VARIOS SENSORES...\"");
 		}
 		else
 		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"        Central en           funcionamiento normal\"");
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROCESADOR EN FUNCIONAMIENTO NORMAL\"");
 		}
 
 		EDG_NEXTION_SendFrame(&hedgNextion);
@@ -1818,23 +1888,11 @@ void EDG_STATE_MACHINE_ShowDate(void)
 void EDG_STATE_MACHINE_SetExecutePage(void)
 {
 
-	EDG_STATE_MACHINE_LoadProgramValues(0);
-	EDG_STATE_MACHINE_RefreshExecutePage();
+	EDG_STATE_MACHINE_LoadProgramValues(0, 0);
 	return;
 
 }
 
-/**
-  * @brief
-  * @param
-  * @retval
-  */
-void EDG_STATE_MACHINE_RefreshExecutePage(void)
-{
-
-	return;
-
-}
 
 /**
   * @brief
@@ -1844,7 +1902,19 @@ void EDG_STATE_MACHINE_RefreshExecutePage(void)
 void EDG_STATE_MACHINE_ChangeTemperature(void)
 {
 
-	hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].Pid.SetPoint = (float)hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_VALUE];
+	if(hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_ACTIVE] == 1)
+	{
+		hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE;
+		hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].Pid.SetPoint = (float)hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_VALUE];
+	}
+	else
+	{
+		hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
+		EDG_AC_CONTROL_StopPWMOutput(&hedgAccontrol, hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]);
+		hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
+		hedgAccontrol.Units[hedgNextion.DataReceived[EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT]].Pid.CurrentValue = 0;
+	}
+
 	return;
 
 }
@@ -1955,7 +2025,7 @@ void EDG_STATE_MACHINE_ResetScheduleMemory(void)
 void EDG_STATE_MACHINE_ResetOffsetMemory(void)
 {
 	//Array with default offset values 5
-	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {5, 5, 5, 5, 5, 5};
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {0, 0, 0, 0, 0, 0};
 	uint8_t Counter;
 
 	for(Counter = 0; Counter < EDG_MEM_ADDR_OFFSET_QTY; Counter++)
@@ -2048,7 +2118,7 @@ void EDG_STATE_MACHINE_SaveProgramValues(uint32_t Program)
   * @param
   * @retval
   */
-void EDG_STATE_MACHINE_LoadProgramValues(uint32_t Program)
+void EDG_STATE_MACHINE_LoadProgramValues(uint32_t Program, uint8_t values)
 {
 
 	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_PROGRAM] = {0};
@@ -2070,7 +2140,16 @@ void EDG_STATE_MACHINE_LoadProgramValues(uint32_t Program)
 		sprintf((char *)hedgNextion.TxFrame,"n%d.val=%d", Counter, Temp[Counter+1]);
 		EDG_NEXTION_SendFrame(&hedgNextion);
 	}
-
+	if(values == 1)
+	{
+		for(Counter = 0; Counter < 12; Counter++)
+		{
+			sprintf((char *)hedgNextion.TxFrame,"h%d.val=%d", (Counter + 1), Temp[(Counter * 2)+1]);
+			EDG_NEXTION_SendFrame(&hedgNextion);
+			sprintf((char *)hedgNextion.TxFrame,"m%d.val=%d", (Counter + 1), Temp[(Counter * 2)+2]);
+			EDG_NEXTION_SendFrame(&hedgNextion);
+		}
+	}
 	sprintf((char *)hedgNextion.TxFrame,"n31.val=%d", Temp[EDG_NEXTION_POS_DRIP_SECONDS]);
 	EDG_NEXTION_SendFrame(&hedgNextion);
 	sprintf((char *)hedgNextion.TxFrame,"escu.val=%d", Temp[EDG_NEXTION_POS_DRIP_SECONDS]);
@@ -2483,6 +2562,16 @@ void EDG_STATE_MACHINE_ResumeActiveProcess(void)
 	return;
 }
 
+
+void EDG_STATE_MACHINE_RefreshExecutePage(void)
+{
+	sprintf((char *)hedgNextion.TxFrame,"n29.val=%.00f", hedgDS18B20.Chip[0].Temperature);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+
+	sprintf((char *)hedgNextion.TxFrame,"n30.val=%.00f", hedgDS18B20.Chip[1].Temperature);
+	EDG_NEXTION_SendFrame(&hedgNextion);
+	return;
+}
 
 /**
   * @brief

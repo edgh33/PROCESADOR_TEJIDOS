@@ -86,10 +86,10 @@ void Error_Handler(void);
 #define CONTROL_6_GPIO_Port GPIOB
 #define RELE_AC_Pin GPIO_PIN_12
 #define RELE_AC_GPIO_Port GPIOB
-#define SCL_EXT_Pin GPIO_PIN_13
-#define SCL_EXT_GPIO_Port GPIOB
-#define SDA_EXT_Pin GPIO_PIN_14
-#define SDA_EXT_GPIO_Port GPIOB
+#define TEMP1_Pin GPIO_PIN_13
+#define TEMP1_GPIO_Port GPIOB
+#define TEMP2_Pin GPIO_PIN_14
+#define TEMP2_GPIO_Port GPIOB
 #define CONTROL_1_Pin GPIO_PIN_8
 #define CONTROL_1_GPIO_Port GPIOA
 #define CRUCE_CERO_1_Pin GPIO_PIN_9

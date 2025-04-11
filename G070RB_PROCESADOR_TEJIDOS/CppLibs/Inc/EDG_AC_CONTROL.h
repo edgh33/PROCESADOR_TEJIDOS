@@ -24,6 +24,7 @@ extern "C" {
 
 #endif
 
+#include "EDG_DS18B20.h"
 #include "EDG_MAX6675.h"
 #include "EDG_MEMORY.h"
 #include "EDG_MEM_ADDR.h"
@@ -138,7 +139,6 @@ typedef enum
 {
 
 	EDG_AC_CONTROL_SENSOR_STATUS_OK,
-	EDG_AC_CONTROL_SENSOR_STATUS_NOT_PRESENT,
 	EDG_AC_CONTROL_SENSOR_STATUS_ERROR,
 
 }EDG_AC_CONTROL_SensorStatusTypeDef;
@@ -207,12 +207,12 @@ typedef struct __EDG_AC_CONTROL_HandleTypeDef
 extern EDG_AC_CONTROL_HandleTypeDef hedgAccontrol;
 
 void EDG_AC_CONTROL_Init(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						 EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675);
+						 EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20);
 void EDG_AC_CONTROL_CheckSensors(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						         EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675);
+						         EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20);
 void EDG_AC_CONTROL_CheckAlarm(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol);
 void EDG_AC_CONTROL_PerformAll(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-						 	   EDG_MAX6675_HandleTypeDef * ptrhedgMAX6675);
+						 	   EDG_DS18B20_HandleTypeDef * ptrhedgDS18B20);
 void EDG_AC_CONTROL_PerformPid(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol);
 void EDG_AC_CONTROL_PerformOnOff(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol);
 void EDG_AC_CONTROL_Pid(EDG_AC_CONTROL_PidStructTypeDef * ptrPidStruct);

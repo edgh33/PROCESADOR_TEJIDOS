@@ -146,6 +146,7 @@ uint8_t EDG_STATE_MACHINE_CheckActiveProcess(void);
 void EDG_STATE_MACHINE_ResumeActiveProcess(void);
 uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void);
 void EDG_STATE_MACHINE_RefreshExecutePage(void);
+void EDG_STATE_MACHINE_SetTemperatureProcess(void);
 
 #ifdef __cplusplus
 }

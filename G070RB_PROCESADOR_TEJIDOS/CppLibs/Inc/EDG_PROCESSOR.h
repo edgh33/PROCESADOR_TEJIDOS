@@ -76,6 +76,7 @@ typedef union
 		uint16_t FlagTimComplete	:1;
 		uint16_t FlagSetRunning 	:1;
 		uint16_t FlagRunning		:1;
+		uint16_t FlagSetPause 		:1;
 		uint16_t FlagError 			:1;
 		uint16_t FlagCheckCarousel 	:1;
 		uint16_t FlagSetManual   	:1;
@@ -128,6 +129,7 @@ typedef enum
 	EDG_PROCESSOR_STATE_RUNNING,
 	EDG_PROCESSOR_STATE_ROTATING,
 	EDG_PROCESSOR_STATE_PAUSE,
+	EDG_PROCESSOR_STATE_RESUME,
 	EDG_PROCESSOR_STATE_FINISH,
 	EDG_PROCESSOR_STATE_ALERT,
 
@@ -156,6 +158,7 @@ typedef struct __EDG_PROCESSOR_HandleTypeDef
 
 	EDG_PROCESSOR_FlagsStatusTypeDef FlagsStatus;
 	EDG_PROCESSOR_States CurrentState;
+	EDG_PROCESSOR_States LastState;
 	EDG_PROCESSOR_CarouselState CurrentCarouselState;
 	EDG_PROCESSOR_ManualState ManualState;
 	uint8_t CurrentProcess[EDG_PROCESSOR_CURR_STATE_ARRAY_SIZE];

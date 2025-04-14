@@ -148,6 +148,9 @@ uint8_t EDG_STATE_MACHINE_SaveCurrentProcess(void);
 void EDG_STATE_MACHINE_RefreshExecutePage(void);
 void EDG_STATE_MACHINE_SetTemperatureProcess(void);
 
+void EDG_STATE_MACHINE_HideButtonsExecute(void);
+void EDG_STATE_MACHINE_ShowButtonsExecute(void);
+
 #ifdef __cplusplus
 }
 #endif

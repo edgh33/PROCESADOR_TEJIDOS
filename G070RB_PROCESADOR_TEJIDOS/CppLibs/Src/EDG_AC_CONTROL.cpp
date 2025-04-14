@@ -309,11 +309,13 @@ void EDG_AC_CONTROL_Pid(EDG_AC_CONTROL_PidStructTypeDef * ptrPidStruct)
 	ptrPidStruct->Error_0 = ptrPidStruct->Error;
 	/* (13/05/23) Al setpoint le quito el valor de offset para el calculo del error */
 	ptrPidStruct->Error = (ptrPidStruct->SetPoint - ptrPidStruct->Offset) - ptrPidStruct->CurrentValue;
-	ptrPidStruct->Error_Sum += (ptrPidStruct->Error * EDG_AC_CONTROL_SAMPLE_TIME_SECS);
+	//ptrPidStruct->Error_Sum += (ptrPidStruct->Error * EDG_AC_CONTROL_SAMPLE_TIME_SECS);
+	ptrPidStruct->Error_Sum += ptrPidStruct->Error;
 
 	ptrPidStruct->Proportional = ptrPidStruct->kp * ptrPidStruct->Error;
 	ptrPidStruct->Integral = ptrPidStruct->ki * ptrPidStruct->Error_Sum;
-	ptrPidStruct->Derivative = ptrPidStruct->kd * ((ptrPidStruct->Error - ptrPidStruct->Error_0)/EDG_AC_CONTROL_SAMPLE_TIME_SECS);
+	//ptrPidStruct->Derivative = ptrPidStruct->kd * ((ptrPidStruct->Error - ptrPidStruct->Error_0)/EDG_AC_CONTROL_SAMPLE_TIME_SECS);
+	ptrPidStruct->Derivative = ptrPidStruct->kd * (ptrPidStruct->Error - ptrPidStruct->Error_0);
 
 	ptrPidStruct->Control = ptrPidStruct->Proportional + ptrPidStruct->Integral + ptrPidStruct->Derivative;
 
@@ -604,13 +606,13 @@ uint16_t EDG_AC_CONTROL_PWMEcuation(float val)
 void EDG_AC_CONTROL_CheckOffsetValues(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol)
 {
 
-	uint8_t Temp[EDG_MEM_ADDR_OFFSET_QTY] = {0};
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_OFFSET] = {0};
 	uint8_t FlagWrite = 0;
 
 	if(EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
 						     EDG_MEM_ADDR_BASE_OFFSET,
 							 Temp,
-							 EDG_MEM_ADDR_OFFSET_QTY) == EDG_MEMORY_STATE_OK)
+							 EDG_MEM_ADDR_VALUES_X_OFFSET) == EDG_MEMORY_STATE_OK)
 	{
 		for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 		{

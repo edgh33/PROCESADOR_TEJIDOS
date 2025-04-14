@@ -109,7 +109,7 @@ void EDG_DS18B20_WriteByte(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t N
 			// write 0
 			EDG_DS18B20_ChangePinOutput(ptrhedgDS18B20, NumChip);  // set as output
 			HAL_GPIO_WritePin (ptrhedgDS18B20->Chip[NumChip].GPIOx, ptrhedgDS18B20->Chip[NumChip].GPIO_Pin, GPIO_PIN_RESET);  // pull the pin LOW
-			EDG_DS18B20_DelayUs(60);  // wait for 60 us
+			EDG_DS18B20_DelayUs(59);  // wait for 60 us
 			EDG_DS18B20_ChangePinInput(ptrhedgDS18B20, NumChip); // set as input
 		}
 	}
@@ -125,13 +125,14 @@ uint8_t EDG_DS18B20_ReadByte(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t
 	{
 		EDG_DS18B20_ChangePinOutput(ptrhedgDS18B20, NumChip);   // set as output
 		HAL_GPIO_WritePin (ptrhedgDS18B20->Chip[NumChip].GPIOx, ptrhedgDS18B20->Chip[NumChip].GPIO_Pin, GPIO_PIN_RESET);  // pull the pin LOW
-		EDG_DS18B20_DelayUs(2);  // wait for 2 us
+		EDG_DS18B20_DelayUs(1);  // wait for 1 us
 		EDG_DS18B20_ChangePinInput(ptrhedgDS18B20, NumChip); // set as input
+		EDG_DS18B20_DelayUs(1);  // wait for 1 us
 		if (HAL_GPIO_ReadPin (ptrhedgDS18B20->Chip[NumChip].GPIOx, ptrhedgDS18B20->Chip[NumChip].GPIO_Pin))  // if the pin is HIGH
 		{
 			value |= 1<<i;  // read = 1
 		}
-		EDG_DS18B20_DelayUs(60);  // wait for 60 us
+		EDG_DS18B20_DelayUs(58);  // wait for 60 us
 	}
 
 	return value;
@@ -149,7 +150,68 @@ void EDG_DS18B20_ReadChipTemperature(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, 
 	uint16_t Temp_byte1 = 0;
 	uint16_t Temp_byte2 = 0;
 	uint16_t TEMP = 0;
+	uint8_t read_tries = 0;
+	uint8_t read_right = 0;
+	float TemperatureTemp[2] = {0.0};
 
+	ptrhedgDS18B20->Chip[NumChip].ChipStatus = EDG_DS18B20_STATUS_ERROR;
+
+	do
+	{
+		if(EDG_DS18B20_Start(ptrhedgDS18B20, NumChip) == 0)
+		{
+			read_tries++;
+		}
+		else
+		{
+
+			EDG_DS18B20_WriteByte(ptrhedgDS18B20, NumChip, 0xCC);  // skip ROM
+			EDG_DS18B20_WriteByte(ptrhedgDS18B20, NumChip, 0x44);  // convert t
+
+			if(EDG_DS18B20_Start(ptrhedgDS18B20, NumChip) == 0)
+			{
+				read_tries++;
+			}
+			else
+			{
+				EDG_DS18B20_WriteByte(ptrhedgDS18B20, NumChip, 0xCC);  // skip ROM
+				EDG_DS18B20_WriteByte(ptrhedgDS18B20, NumChip, 0xBE);  // Read Scratch-pad
+
+				Temp_byte1 = EDG_DS18B20_ReadByte(ptrhedgDS18B20, NumChip);
+				Temp_byte2 = EDG_DS18B20_ReadByte(ptrhedgDS18B20, NumChip);
+				TEMP = ((Temp_byte2<<8))|Temp_byte1;
+
+				//ptrhedgDS18B20->Chip[NumChip].Temperature = ((float)(TEMP & 0x7FF) * 0.0625);
+				TemperatureTemp[read_right] = ((float)(TEMP & 0x7FF) * 0.0625);
+				if((TEMP >> 11) & 0x001F)
+				{
+					//ptrhedgDS18B20->Chip[NumChip].Temperature *= -1;
+					TemperatureTemp[read_right] *= -1;
+					read_tries++;
+				}
+				else
+				{
+					read_right++;
+					if(read_right >= 2)
+					{
+						if(TemperatureTemp[0] > TemperatureTemp[1])
+						{
+							ptrhedgDS18B20->Chip[NumChip].Temperature = TemperatureTemp[1];
+						}
+						else
+						{
+							ptrhedgDS18B20->Chip[NumChip].Temperature = TemperatureTemp[0];
+						}
+						ptrhedgDS18B20->Chip[NumChip].ChipStatus = EDG_DS18B20_STATUS_OK;
+					}
+				}
+			}
+		}
+		EDG_DS18B20_DelayUs(20);  // wait for 10 us if it's needed read again
+	}while((read_tries < EDG_DS18B20_MAX_READ_TRIES) && (ptrhedgDS18B20->Chip[NumChip].ChipStatus == EDG_DS18B20_STATUS_ERROR));
+
+
+	/*
 	if(EDG_DS18B20_Start(ptrhedgDS18B20, NumChip) == 0)
 	{
 		ptrhedgDS18B20->Chip[NumChip].ChipStatus = EDG_DS18B20_STATUS_ERROR;
@@ -183,7 +245,7 @@ void EDG_DS18B20_ReadChipTemperature(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, 
 	{
 		ptrhedgDS18B20->Chip[NumChip].Temperature *= -1;
 	}
-
+	*/
 	return;
 }
 

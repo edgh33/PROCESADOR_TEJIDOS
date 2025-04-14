@@ -49,9 +49,9 @@ typedef enum
 typedef enum
 {
 
-	EDG_SCHEDULE_STATUS_NO_APPLIDED,
+	EDG_SCHEDULE_STATUS_NO_APPLIED,
+	EDG_SCHEDULE_STATUS_TO_APPLY,
 	EDG_SCHEDULE_STATUS_APPLIDED,
-	EDG_SCHEDULE_STATUS_INIT_OFF,
 
 
 }EDG_SCHEDULE_StatusTypeDef;
@@ -80,8 +80,6 @@ typedef struct __EDG_SCHEDULE_HandleTypeDef
 	EDG_SCHEDULE_DateTypeDef CurrentDate;
 	EDG_SCHEDULE_DateTypeDef ActiveHour;
 	EDG_SCHEDULE_StatusTypeDef ActiveStatus;
-	EDG_SCHEDULE_DateTypeDef InactiveHour;
-	EDG_SCHEDULE_StatusTypeDef InactiveStatus;
 
 	EDG_SCHEDULE_StateDayTypeDef StateCurrentDay;
 	uint8_t CurrentWeekDay;
@@ -95,13 +93,7 @@ void EDG_SCHEDULE_Init(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_Han
 void EDG_SCHEDULE_GetScheduleToday(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_GetCurrentDate(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_CheckActive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
-	  	  	   			   	  EDG_RTC_HandleTypeDef * ptrhedgRTC,
-							  EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-							  EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
-void EDG_SCHEDULE_CheckInactive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
-		  	  	  	  	  	    EDG_RTC_HandleTypeDef * ptrhedgRTC,
-								EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol,
-								EDG_NEXTION_HandleTypeDef * ptrhedgNextion);
+	  	  	   			   	  EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_CheckChangeDay(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,  EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_HourToMinutes(EDG_SCHEDULE_DateTypeDef * ptrhedgScheduleDate);
 

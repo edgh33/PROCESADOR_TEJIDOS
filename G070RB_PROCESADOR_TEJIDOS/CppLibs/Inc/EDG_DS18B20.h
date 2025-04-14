@@ -28,6 +28,7 @@ extern "C" {
 
 #define EDG_DS18B20_MAX_NUM_CHIPS 			(2)
 #define EDG_DS18B20_ALL_CHIPS_ENABLED_MASK 	(0x03)
+#define EDG_DS18B20_MAX_READ_TRIES			(4)
 
 typedef enum
 {

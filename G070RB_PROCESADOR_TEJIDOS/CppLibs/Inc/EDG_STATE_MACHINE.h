@@ -33,6 +33,8 @@ extern "C" {
 #define EDG_STATE_MACHINE_DEBUG_PORT		USART3
 #define EDG_STATE_MACHINE_DEBUG_PORT_HANDLE huart3
 
+#define ENG_STATE_MACH_WATCHDOG			1	//Enable watchdog in code
+
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT	 (1)
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_ACTIVE (2)
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_VALUE	 (3)
@@ -123,7 +125,6 @@ void EDG_STATE_MACHINE_TestTempetatureChips(void);
 void EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PageTypeDef page);
 void EDG_STATE_MACHINE_SetDate(void);
 void EDG_STATE_MACHINE_ShowDate(void);
-void EDG_STATE_MACHINE_SetExecutePage(void);
 void EDG_STATE_MACHINE_ChangeTemperature(void);
 void EDG_STATE_MACHINE_CheckMemory(void);
 void EDG_STATE_MACHINE_ResetProgramMemory(void);

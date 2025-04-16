@@ -125,6 +125,10 @@ void EDG_STATE_MACHINE_InitState(void)
 	EDG_STATE_MACHINE_CheckRTC();
 	EDG_BUZZER_Init(&hedgBuzzer);
 
+#if ENG_STATE_MACH_WATCHDOG == 1
+	HAL_IWDG_Refresh(&hiwdg);
+#endif
+
 	HAL_Delay(2000);
 
 	if(EDG_NEXTION_GetCurrentePage(&hedgNextion) != EDG_NEXTION_PAGE_START)
@@ -178,12 +182,8 @@ void EDG_STATE_MACHINE_InitState(void)
 	if(hedgAccontrol.AlarmStatus == EDG_AC_CONTROL_ALARM_STATUS_INACTIVE)
 	{
 
-		//REVISAR EL INICIO DEL CALENDARIO!!!!!
-		//TENER PRESENTE QUE EL CALENDARIO SE DEBE REVISAR CONSTANTEMENTE
-		//ACA SE DEBE REVISAR TAMBIEN SI HAY PROCESO ACTIVO
 		EDG_SCHEDULE_Init(&hedgSchedule, &hedgRTC);
-		hedgTimer.FlagsStatus.Flag1m = true; //for make a fast check in idle
-		//EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC);
+		hedgTimer.FlagsStatus.Flag1m = true; //for make a fast check of schedule in idle
 
 		EDG_BUZZER_Sound(10, 15, 0, 1, 2);
 
@@ -200,6 +200,7 @@ void EDG_STATE_MACHINE_InitState(void)
 		EDG_NEXTION_EnableTouch(&hedgNextion);
 		EDG_NEXTION_StartReceiveFrame(&hedgNextion);
 
+		EDG_TIMER_SyncRTC(&hedgTimer, &hedgRTC);
 		EDG_TIMER_StarBaseTime(&hedgTimer, &hedgRTC);
 		/*** If all is right change to idle state ***/
 		if(EDG_STATE_MACHINE_TEST_STATE == EDG_STATE_MACHINE_TEST_INACTIVE)
@@ -282,6 +283,7 @@ void EDG_STATE_MACHINE_IdleState(void)
 		else
 		{
 			EDG_NEXTION_StartReceiveFrame(&hedgNextion);
+			EDG_NEXTION_EnableTouch(&hedgNextion);
 		}
 
 	}
@@ -321,19 +323,35 @@ void EDG_STATE_MACHINE_IdleState(void)
 		EDG_SCHEDULE_CheckActive(&hedgSchedule, &hedgRTC);
 		if(hedgSchedule.ActiveStatus == EDG_SCHEDULE_STATUS_TO_APPLY)
 		{
-			hedgProcessor.FlagsStatus.FlagSetRunning = 1;
-			hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
-			EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_PROCESS);
-			hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] = hedgSchedule.Program;
-			EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
-			sprintf((char *)hedgNextion.TxFrame,"n24.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] + 1);
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			sprintf((char *)hedgNextion.TxFrame,"bt14.val=1");
-			EDG_NEXTION_SendFrame(&hedgNextion);
-			EDG_STATE_MACHINE_LoadProgramValues(hedgSchedule.Program, 0);
+			if((hedgProcessor.FlagsStatus.FlagSetRunning == 0) && (hedgProcessor.FlagsStatus.FlagRunning == 0))
+			{
+				hedgProcessor.FlagsStatus.FlagSetRunning = 1;
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+				EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_PROCESS);
+				hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] = hedgSchedule.Program;
+				EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
+				EDG_STATE_MACHINE_ShowDate();
+				sprintf((char *)hedgNextion.TxFrame,"n24.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] + 1);
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				sprintf((char *)hedgNextion.TxFrame,"bt14.val=1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+				EDG_STATE_MACHINE_LoadProgramValues(hedgSchedule.Program, 0);
+			}
+			else
+			{
+				hedgSchedule.ActiveStatus = EDG_SCHEDULE_STATUS_APPLIDED;
+			}
 		}
+	}
+
+#if ENG_STATE_MACH_WATCHDOG == 1
+	if(hedgTimer.FlagsStatus.FlagIwdg == true)
+	{
+		hedgTimer.FlagsStatus.FlagIwdg = false;
+		HAL_IWDG_Refresh(&hiwdg);
 
 	}
+#endif
 
 	if(hedgTimer.FlagsStatus.Flag1h == true)
 	{
@@ -655,8 +673,21 @@ void EDG_STATE_MACHINE_Process(void)
 				EDG_PROCESSOR_SHAKE_RELAY_INACTIVE();
 				hedgProcessor.FlagsStatus.FlagRunning = 0;
 				hedgProcessor.FlagsStatus.FlagShaking = 0;
+
 				EDG_STATE_MACHINE_LoadProgramValues(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM], 0);
 				EDG_STATE_MACHINE_ShowButtonsExecute();
+
+				//Turn off the temperature control
+				hedgAccontrol.Units[0].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
+				EDG_AC_CONTROL_StopPWMOutput(&hedgAccontrol, 0);
+				hedgAccontrol.Units[0].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
+				hedgAccontrol.Units[0].Pid.CurrentValue = 0;
+
+				hedgAccontrol.Units[1].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
+				EDG_AC_CONTROL_StopPWMOutput(&hedgAccontrol, 1);
+				hedgAccontrol.Units[1].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
+				hedgAccontrol.Units[1].Pid.CurrentValue = 0;
+
 				hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_IS_ACTIVE] = 0; //Flag that check is there is a process running!!!
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
 				EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
@@ -1263,6 +1294,7 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 
 			EDG_STATE_MACHINE_SetDate();
 			EDG_STATE_MACHINE_ShowDate();
+			EDG_TIMER_SyncRTC(&hedgTimer, &hedgRTC);
 
 			break;
 
@@ -1308,7 +1340,6 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 			break;
 
 		case EDG_NEXTION_COMMAND_SAVE_SCHEDULE:
-
 
 			EDG_STATE_MACHINE_SaveScheduleValues(hedgNextion.DataReceived[EDG_NEXTION_POS_WEEK_DAY]);
 			EDG_STATE_MACHINE_LoadScheduleValues();
@@ -1848,8 +1879,7 @@ void EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PageTypeDef page)
 	EDG_NEXTION_ChangePage(&hedgNextion, page);
 	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
 	{
-		EDG_STATE_MACHINE_SetExecutePage();
-		EDG_STATE_MACHINE_RefreshExecutePage();
+		EDG_STATE_MACHINE_LoadProgramValues(0, 0);
 	}
 	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_PROGRAM)
 	{
@@ -1965,19 +1995,6 @@ void EDG_STATE_MACHINE_ShowDate(void)
 																	 hedgRTC.CurrentDate.Year);
 	EDG_NEXTION_SendFrame(&hedgNextion);
 
-	return;
-
-}
-
-/**
-  * @brief
-  * @param
-  * @retval
-  */
-void EDG_STATE_MACHINE_SetExecutePage(void)
-{
-
-	EDG_STATE_MACHINE_LoadProgramValues(0, 0);
 	return;
 
 }
@@ -2589,6 +2606,7 @@ void EDG_STATE_MACHINE_ResumeActiveProcess(void)
 	uint8_t Counter;
 
 	EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PAGE_EXECUTE);
+	EDG_STATE_MACHINE_ShowDate();
 
 	sprintf((char *)hedgNextion.TxFrame,"n24.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] + 1);
 	EDG_NEXTION_SendFrame(&hedgNextion);

@@ -75,11 +75,20 @@ void EDG_TIMER_SyncRTC(EDG_TIMER_HandleTypeDef * ptrhedgTimer,
 					   EDG_RTC_HandleTypeDef * ptrhedgRTC)
 {
 
-	EDG_RTC_GetDate(ptrhedgRTC, EDG_RTC_ADDRESS);
+	if(ptrhedgRTC->CurrentState == EDG_RTC_STATE_OK)
+	{
+		EDG_RTC_GetDate(ptrhedgRTC, EDG_RTC_ADDRESS);
+		ptrhedgTimer->CounterSegs = ptrhedgRTC->CurrentDate.Second;
+		ptrhedgTimer->CounterMins = ptrhedgRTC->CurrentDate.Minute;
+		ptrhedgTimer->CounterHours = ptrhedgRTC->CurrentDate.Hour;
+	}
+	else
+	{
+		ptrhedgTimer->CounterSegs = 0;
+		ptrhedgTimer->CounterMins = 0;
+		ptrhedgTimer->CounterHours = 0;
+	}
 
-	ptrhedgTimer->CounterSegs = ptrhedgRTC->CurrentDate.Second;
-	ptrhedgTimer->CounterMins = ptrhedgRTC->CurrentDate.Minute;
-	ptrhedgTimer->CounterHours = ptrhedgRTC->CurrentDate.Hour;
 
 	return;
 

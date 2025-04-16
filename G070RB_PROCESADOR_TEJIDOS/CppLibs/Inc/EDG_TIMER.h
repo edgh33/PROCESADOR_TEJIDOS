@@ -48,7 +48,8 @@ typedef union
 		uint8_t Flag1m :1;
 		uint8_t Flag1h :1;
 		uint8_t Flag1d :1;
-		uint8_t FlagBaseTimeSecs1 :1;
+		uint8_t FlagIwdg			:1;
+		uint8_t FlagBaseTimeSecs1 	:1;
 
 	};
 }EDG_TIMER_FlagsStatusTypeDef;

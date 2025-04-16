@@ -21,6 +21,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 
 		hedgTimer.FlagsStatus.Flag1s = true;
+		hedgTimer.FlagsStatus.FlagIwdg = true;
 		hedgTimer.CounterSegs++;
 		hedgTimer.CounterBaseTimeSecs1++;
 

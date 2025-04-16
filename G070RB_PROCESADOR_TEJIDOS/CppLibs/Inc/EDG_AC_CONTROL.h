@@ -67,13 +67,14 @@ extern "C" {
 */
 
 //For the processor I'll usefor L0 and L1 the same values that L5 that is similar
-#define EDG_AC_CONTROL_PID_P_L0		(300.0)    	//Good test 150		250
-#define EDG_AC_CONTROL_PID_I_L0		(0.01)		//Good test 0.1		0.5
-#define EDG_AC_CONTROL_PID_D_L0		(700.0)		//Good test 50		150
+//Values from online simulator Kp = 2.5, Ki = 0.02, Kd = 13 , link https://www.luisllamas.es/simulador-control-pid/
+#define EDG_AC_CONTROL_PID_P_L0		(1700.0)    	//Good test 150		250		1500.0
+#define EDG_AC_CONTROL_PID_I_L0		(0.75)			//Good test 0.1		0.5		0.25
+#define EDG_AC_CONTROL_PID_D_L0		(0.005)			//Good test 50		150		0.001
 
-#define EDG_AC_CONTROL_PID_P_L1		(300.0)		//Good test 150		250
-#define EDG_AC_CONTROL_PID_I_L1		(0.01)		//Good test 0.1		0.5
-#define EDG_AC_CONTROL_PID_D_L1		(700.0)		//Good test 50		150
+#define EDG_AC_CONTROL_PID_P_L1		(1700.0)		//Good test 150		250		1500.0
+#define EDG_AC_CONTROL_PID_I_L1		(0.75)			//Good test 0.1		0.5		0.25
+#define EDG_AC_CONTROL_PID_D_L1		(0.005)			//Good test 50		150		0.001
 
 #define EDG_AC_CONTROL_PID_P_L2		(4500.0)	//Test Value: 4500.0
 #define EDG_AC_CONTROL_PID_I_L2		(0.025)		//Test Value: 0.5

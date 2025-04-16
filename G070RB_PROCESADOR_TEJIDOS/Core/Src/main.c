@@ -20,6 +20,7 @@
 #include "main.h"
 #include "dma.h"
 #include "i2c.h"
+#include "iwdg.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -106,6 +107,10 @@ int main(void)
   MX_TIM7_Init();
   MX_TIM14_Init();
   MX_TIM17_Init();
+#if ENG_STATE_MACH_WATCHDOG == 1
+  MX_IWDG_Init();
+#endif
+
   /* USER CODE BEGIN 2 */
 
   InitCpp();

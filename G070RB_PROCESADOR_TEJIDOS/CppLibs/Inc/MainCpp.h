@@ -17,6 +17,7 @@ extern "C" {
 #include <string.h>
 #include "main.h"
 #include "usart.h"
+#include "iwdg.h"
 
 #include "EDG_AC_CONTROL.h"
 #include "EDG_CONFIG.h"
@@ -33,6 +34,7 @@ extern "C" {
 #include "EDG_MEM_ADDR.h"
 #include "EDG_SCHEDULE.h"
 #include "EDG_BUZZER.h"
+
 
 void InitCpp(void);
 void MainCpp(void);

@@ -33,7 +33,7 @@ extern "C" {
 #define EDG_STATE_MACHINE_DEBUG_PORT		USART3
 #define EDG_STATE_MACHINE_DEBUG_PORT_HANDLE huart3
 
-#define ENG_STATE_MACH_WATCHDOG			1	//Enable watchdog in code
+#define ENG_STATE_MACH_WATCHDOG			0	//Enable watchdog in code
 
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT	 (1)
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_ACTIVE (2)
@@ -136,6 +136,7 @@ void EDG_STATE_MACHINE_SaveProgramValues(uint32_t Program);
 void EDG_STATE_MACHINE_LoadProgramValues(uint32_t Program, uint8_t values);
 void EDG_STATE_MACHINE_SaveScheduleValues(uint32_t Day);
 void EDG_STATE_MACHINE_LoadScheduleValues(void);
+void EDG_STATE_MACHINE_ClearScheduleValues(void);
 void EDG_STATE_MACHINE_SaveOffsetValues(void);
 void EDG_STATE_MACHINE_LoadOffsetValues(void);
 void EDG_STATE_MACHINE_BuzzerConfig(void);

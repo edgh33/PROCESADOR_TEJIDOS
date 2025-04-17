@@ -77,6 +77,7 @@ typedef union
 		uint16_t FlagSetRunning 	:1;
 		uint16_t FlagRunning		:1;
 		uint16_t FlagSetPause 		:1;
+		uint16_t FlagSetFinish 		:1;
 		uint16_t FlagError 			:1;
 		uint16_t FlagCheckCarousel 	:1;
 		uint16_t FlagSetManual   	:1;

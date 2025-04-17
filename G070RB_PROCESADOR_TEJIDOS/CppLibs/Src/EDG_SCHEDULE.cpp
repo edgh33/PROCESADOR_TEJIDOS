@@ -60,6 +60,38 @@ void EDG_SCHEDULE_GetScheduleToday(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
   * @param
   * @retval
   */
+void EDG_SCHEDULE_ClearScheduleToday(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule)
+{
+	uint8_t Temp[EDG_MEM_ADDR_VALUES_X_SCHEDULE] = {0};
+
+
+	EDG_MEMORY_ReadMemory(EDG_MEMORY_ADDRESS_MEM1,
+						  (EDG_MEM_ADDR_BASE_SCHEDULE+ (EDG_MEM_ADDR_SCHEDULE_OFFSET * (ptrhedgSchedule->CurrentDate.WeekDay - 1))),
+						  Temp,
+						  EDG_MEM_ADDR_VALUES_X_SCHEDULE);
+
+	Temp[0] = EDG_SCHEDULE_STATE_DAY_INACTIVE;
+	ptrhedgSchedule->StateCurrentDay = (EDG_SCHEDULE_StateDayTypeDef)Temp[0];
+	ptrhedgSchedule->CurrentWeekDay = ptrhedgSchedule->CurrentDate.WeekDay;
+	ptrhedgSchedule->ActiveHour.Hour = Temp[1];
+	ptrhedgSchedule->ActiveHour.Minute = Temp[2];
+	ptrhedgSchedule->ActiveHour.AmPm = Temp[3];
+	ptrhedgSchedule->Program = Temp[4] - 1; // minus 1 because the program is load between 1 -10
+
+	EDG_MEMORY_WriteMemory(EDG_MEMORY_ADDRESS_MEM1,
+							  (EDG_MEM_ADDR_BASE_SCHEDULE + (EDG_MEM_ADDR_SCHEDULE_OFFSET * (ptrhedgSchedule->CurrentDate.WeekDay - 1))),
+							  Temp,
+							  EDG_MEM_ADDR_VALUES_X_SCHEDULE);
+
+	return;
+
+}
+
+/**
+  * @brief
+  * @param
+  * @retval
+  */
 void EDG_SCHEDULE_GetCurrentDate(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC)
 {
 
@@ -93,6 +125,10 @@ void EDG_SCHEDULE_CheckActive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
 			if(ptrhedgSchedule->CurrentDate.HourInMinutes == ptrhedgSchedule->ActiveHour.HourInMinutes)
 			{
 				ptrhedgSchedule->ActiveStatus = EDG_SCHEDULE_STATUS_TO_APPLY;
+			}
+			else if(ptrhedgSchedule->CurrentDate.HourInMinutes > ptrhedgSchedule->ActiveHour.HourInMinutes)
+			{
+				EDG_SCHEDULE_ClearScheduleToday(&hedgSchedule);
 			}
 		}
 	}

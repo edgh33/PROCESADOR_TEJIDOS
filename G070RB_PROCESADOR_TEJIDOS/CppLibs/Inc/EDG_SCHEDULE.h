@@ -91,6 +91,7 @@ extern EDG_SCHEDULE_HandleTypeDef hedgSchedule;
 
 void EDG_SCHEDULE_Init(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_GetScheduleToday(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC);
+void EDG_SCHEDULE_ClearScheduleToday(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule);
 void EDG_SCHEDULE_GetCurrentDate(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule, EDG_RTC_HandleTypeDef * ptrhedgRTC);
 void EDG_SCHEDULE_CheckActive(EDG_SCHEDULE_HandleTypeDef * ptrhedgSchedule,
 	  	  	   			   	  EDG_RTC_HandleTypeDef * ptrhedgRTC);

@@ -272,6 +272,15 @@ void EDG_STATE_MACHINE_IdleState(void)
 
 /* MAIN LOOP START ----------------------------------------------------------------------------------------*/
 
+#if ENG_STATE_MACH_WATCHDOG == 1
+	if(hedgTimer.FlagsStatus.FlagIwdg == true)
+	{
+		hedgTimer.FlagsStatus.FlagIwdg = false;
+		HAL_IWDG_Refresh(&hiwdg);
+
+	}
+#endif
+
 	if(hedgNextion.RxFrameStatus == EDG_NEXTION_RX_FRAME_STATUS_INCOMING_FRAME)
 	{
 		EDG_NEXTION_ReceiveFrame(&hedgNextion);
@@ -345,16 +354,6 @@ void EDG_STATE_MACHINE_IdleState(void)
 		return;
 	}
 
-
-#if ENG_STATE_MACH_WATCHDOG == 1
-	if(hedgTimer.FlagsStatus.FlagIwdg == true)
-	{
-		hedgTimer.FlagsStatus.FlagIwdg = false;
-		HAL_IWDG_Refresh(&hiwdg);
-
-	}
-#endif
-
 	if(hedgTimer.FlagsStatus.Flag1h == true)
 	{
 		hedgTimer.FlagsStatus.Flag1h = false;
@@ -391,7 +390,6 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 				EDG_AC_CONTROL_CloseAcRelay();
 				EDG_STATE_MACHINE_ResumeActiveProcess();
 				EDG_BUZZER_Stop();
-
 			}
 			else
 			{
@@ -399,8 +397,8 @@ void EDG_STATE_MACHINE_TemperatureControlState(void)
 				{
 					EDG_STATE_MACHINE_RefreshExecutePage();
 				}
+				EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
 			}
-			EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
 		}
 		else
 		{
@@ -520,37 +518,25 @@ void EDG_STATE_MACHINE_Process(void)
 			//Clear the flag for resume de process
 			hedgProcessor.FlagsStatus.FlagResume = 0;
 
-			//TODO!!! Add routine for temperature control!!!
-			hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
-			hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
-			hedgProcessor.TotalTimeDelayMinutes = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN];
-			if(hedgProcessor.TotalTimeDelayMinutes > 0)
+			if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] != hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS])
 			{
-				hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_DELAY;
-				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  PROGRAMA   EN RETARDO\"");
-				EDG_NEXTION_SendFrame(&hedgNextion);
-				//Start Tim for 60 seconds
-				EDG_PROCESSOR_StartTim(&hedgProcessor, EDG_PROCESSOR_SECONDS_X_MIN);
-			}
-			else
-			{
-				//Make all the decisions based in the read data
 
-				//Select the right process based on the carrusel position:
-				//If carousel is downs it means that program is in execution
-				if((hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] == hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS])
-					&& (hedgProcessor.TotalTimeCurrenteContainer == 0)
-				)
+				hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
+				hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
+				hedgProcessor.TotalTimeDelayMinutes = (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_HOUR] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_DELAY_MIN];
+				if(hedgProcessor.TotalTimeDelayMinutes > 0)
 				{
-					hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_FINISH;
-					EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
-					HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
-					hedgProcessor.FlagsStatus.FlagShaking = 1;
-					hedgProcessor.FlagsStatus.FlagSetFinish = 1;
-					hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+					hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_DELAY;
+					sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"  PROGRAMA   EN RETARDO\"");
+					EDG_NEXTION_SendFrame(&hedgNextion);
+					//Start Tim for 60 seconds
+					EDG_PROCESSOR_StartTim(&hedgProcessor, EDG_PROCESSOR_SECONDS_X_MIN);
 				}
 				else
 				{
+					//Make all the decisions based in the read data
+					//Select the right process based on the carrusel position:
+					//If carousel is downs it means that program is in execution
 					switch(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS])
 					{
 						case EDG_PROCESSOR_CAROUSEL_POS_UNKNOW:
@@ -562,6 +548,7 @@ void EDG_STATE_MACHINE_Process(void)
 							EDG_NEXTION_SendFrame(&hedgNextion);
 							sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
 							EDG_NEXTION_SendFrame(&hedgNextion);
+
 							break;
 
 						case EDG_PROCESSOR_CAROUSEL_POS_DOWN:
@@ -667,13 +654,20 @@ void EDG_STATE_MACHINE_Process(void)
 					}
 				}
 			}
+			else
+			{
+				hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_FINISH;
+				EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
+				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
+				hedgProcessor.FlagsStatus.FlagShaking = 1;
+				hedgProcessor.FlagsStatus.FlagSetFinish = 1;
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+			}
 
 			EDG_STATE_MACHINE_SetTemperatureProcess();
 			//Set the flag for start de process
 			hedgProcessor.FlagsStatus.FlagRunning = 1;
-
 		}
-
 	}
 	//If process is running check the current state
 	if(hedgProcessor.FlagsStatus.FlagRunning)
@@ -854,23 +848,23 @@ void EDG_STATE_MACHINE_Process(void)
 																			hedgProcessor.CurrentProcess[hedgProcessor.Index + 1]);
 						EDG_NEXTION_SendFrame(&hedgNextion);
 						//SET THE NEXT CONTAINER!!!!
-						hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER]++;
+						//hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER]++;
 						//Compare current container with total container
-						if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] == hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS])
-						{
-							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_FINISH;
-							hedgProcessor.FlagsStatus.FlagSetFinish = 1;
-							hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
-						}
-						else
-						{
+//						if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] == hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS])
+//						{
+//							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_FINISH;
+//							hedgProcessor.FlagsStatus.FlagSetFinish = 1;
+//							hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+//						}
+//						else
+//						{
 							//Set the index for show for the hour and minute of current container
-							hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
-							hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
+							//hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
+							//hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
 							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_ROTATING;
 							hedgProcessor.CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_CHECKING;
 							hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
-						}
+//						}
 						EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
 					}
 				}
@@ -1002,21 +996,34 @@ void EDG_STATE_MACHINE_Process(void)
 							EDG_PROCESSOR_RAISE_RELAY_INACTIVE();
 							EDG_PROCESSOR_SHAKE_RELAY_ACTIVE();
 							HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
-							sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
-							EDG_NEXTION_SendFrame(&hedgNextion);
-							sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
-							EDG_NEXTION_SendFrame(&hedgNextion);
-							sprintf((char *)hedgNextion.TxFrame,"vis bt14,1");
-							EDG_NEXTION_SendFrame(&hedgNextion);
-							sprintf((char *)hedgNextion.TxFrame,"vis q%d,0", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER]); //Past container in zero
-							EDG_NEXTION_SendFrame(&hedgNextion);
-							sprintf((char *)hedgNextion.TxFrame,"vis q%d,1", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] + 1); //Past current in one
-							EDG_NEXTION_SendFrame(&hedgNextion);
-							hedgProcessor.CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_CHECKING;
-							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_DOWN;
-							hedgProcessor.FlagsStatus.FlagCarouselPos = 0;
-							hedgProcessor.FlagsStatus.FlagShaking = 1;
-							hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_RUNNING;
+							//SET THE NEXT CONTAINER!!!!
+							hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER]++;
+							if(hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] == hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_ACTIVE_CONTAINERS])
+							{
+								hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_FINISH;
+								hedgProcessor.FlagsStatus.FlagSetFinish = 1;
+								hedgProcessor.FlagsStatus.FlagTimComplete = 1; //Trick for jump next state
+							}
+							else
+							{
+								hedgProcessor.Index = EDG_PROCESSOR_ARR_POS_CURR_HOUR_CONTAIN_1 + (hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] * 2);
+								hedgProcessor.TotalTimeCurrenteContainer = (hedgProcessor.CurrentProcess[hedgProcessor.Index] * EDG_PROCESSOR_SECONDS_X_MIN) + hedgProcessor.CurrentProcess[hedgProcessor.Index + 1];
+								sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROGRAMA EN  EJECUCION\"");
+								EDG_NEXTION_SendFrame(&hedgNextion);
+								sprintf((char *)hedgNextion.TxFrame,"vis bt0,1");
+								EDG_NEXTION_SendFrame(&hedgNextion);
+								sprintf((char *)hedgNextion.TxFrame,"vis bt14,1");
+								EDG_NEXTION_SendFrame(&hedgNextion);
+								sprintf((char *)hedgNextion.TxFrame,"vis q%d,0", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER]); //Past container in zero
+								EDG_NEXTION_SendFrame(&hedgNextion);
+								sprintf((char *)hedgNextion.TxFrame,"vis q%d,1", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CONTAINER] + 1); //Past current in one
+								EDG_NEXTION_SendFrame(&hedgNextion);
+								hedgProcessor.CurrentCarouselState = EDG_PROCESSOR_CAROUSEL_STATE_CHECKING;
+								hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_CAROU_POS] = EDG_PROCESSOR_CAROUSEL_POS_DOWN;
+								hedgProcessor.FlagsStatus.FlagCarouselPos = 0;
+								hedgProcessor.FlagsStatus.FlagShaking = 1;
+								hedgProcessor.CurrentState = EDG_PROCESSOR_STATE_RUNNING;
+							}
 							EDG_STATE_MACHINE_SaveCurrentProcess(); //Check if the save process is right!!
 							EDG_PROCESSOR_StopTim(&hedgProcessor);
 							EDG_PROCESSOR_StartTim(&hedgProcessor, EDG_PROCESSOR_SECONDS_X_MIN); //Start Tim for 60 seconds for start counting
@@ -1031,7 +1038,6 @@ void EDG_STATE_MACHINE_Process(void)
 
 						break;
 					}
-
 				}
 
 				break;
@@ -1069,6 +1075,7 @@ void EDG_STATE_MACHINE_Process(void)
 
 				if(hedgProcessor.FlagsStatus.FlagSetFinish)
 				{
+					hedgProcessor.FlagsStatus.FlagTimComplete = 0;
 					hedgProcessor.FlagsStatus.FlagSetFinish = 0;
 
 					EDG_BUZZER_Sound(50, 50, 100, 2, 10);
@@ -1081,9 +1088,8 @@ void EDG_STATE_MACHINE_Process(void)
 					sprintf((char *)hedgNextion.TxFrame,"bt14.val=1");
 					EDG_NEXTION_SendFrame(&hedgNextion);
 					EDG_PROCESSOR_StopTim(&hedgProcessor);
-					EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_SECONDS_X_MIN); //The tim starts for 200ms checking of carousel changing position
+					EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_SECONDS_X_MIN); //The tim is set for checking each minute
 				}
-
 
 			case EDG_PROCESSOR_STATE_ALERT:
 
@@ -1125,6 +1131,7 @@ void EDG_STATE_MACHINE_Manual(void)
 				HAL_Delay(EDG_PROCESSOR_DELAY_TIME_MS);
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
 				EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_CHECK_TIME_MS); //The tim starts for 200ms checking of carousel position
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
 
 				break;
 
@@ -1139,6 +1146,7 @@ void EDG_STATE_MACHINE_Manual(void)
 				hedgProcessor.FlagsStatus.FlagCheckCarousel = 0;
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
 				EDG_PROCESSOR_StartTimMs(&hedgProcessor, EDG_PROCESSOR_CHECK_TIME_MS); //The tim starts for 200ms checking of carousel position
+				hedgProcessor.FlagsStatus.FlagTimComplete = 1;//Trick for jump next state
 
 				break;
 
@@ -1274,12 +1282,12 @@ void EDG_STATE_MACHINE_Manual(void)
 				hedgProcessor.FlagsStatus.FlagManual = 0;
 				EDG_PROCESSOR_StopTim(&hedgProcessor);
 				EDG_NEXTION_EnableTouch(&hedgNextion);
-				EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
+
 
 				break;
 		}
 	}
-
+	EDG_STATE_MACHINE_SetNextState(&hedgStateMachine, EDG_STATE_MACHINE_STATE_IDLE);
 	return;
 
 }
@@ -1304,7 +1312,6 @@ void EDG_STATE_MACHINE_ExecCommandState(void)
 		case EDG_NEXTION_COMMAND_CHANGE_PAGE:
 
 			EDG_STATE_MACHINE_ChangePage((EDG_NEXTION_PageTypeDef)hedgNextion.DataReceived[EDG_NEXTION_POS_PAGE]);
-			EDG_STATE_MACHINE_ShowDate();
 
 			break;
 
@@ -1452,7 +1459,7 @@ void EDG_STATE_MACHINE_AlarmState(void)
 
 	if(EDG_NEXTION_GetCurrentePage(&hedgNextion) != EDG_NEXTION_PAGE_ALARM)
 	{
-		EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_ALARM);
+		EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PAGE_ALARM);
 	}
 
 	EDG_BUZZER_Sound(10, 20, 100, 3, 0);
@@ -1468,76 +1475,96 @@ void EDG_STATE_MACHINE_AlarmState(void)
   */
 void EDG_STATE_MACHINE_TestState(void)
 {
-	uint8_t Presence = 0;
-	uint16_t Temp_byte1 = 0;
-	uint16_t Temp_byte2 = 0;
-	uint16_t TEMP = 0;
-	float Temperature = 0.0;
-	uint8_t counter = 0;
+
+//	uint8_t Presence = 0;
+//	uint16_t Temp_byte1 = 0;
+//	uint16_t Temp_byte2 = 0;
+//	uint16_t TEMP = 0;
+//	float Temperature = 0.0;
+//	uint8_t counter = 0;
 
 
-	/*
+//	while(1)
+//	{
+//
+//		__HAL_TIM_SET_COUNTER(&EDG_DS18B20_TIM_BASE_HANDLER, 0);
+//		EDG_DS18B20_ChangePinOutput(&hedgDS18B20, 1);
+//		TEMP = __HAL_TIM_GET_COUNTER(&EDG_DS18B20_TIM_BASE_HANDLER);
+//		sprintf((char *)stringDebug, "Tiempo a output = %d\n", TEMP);
+//		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+//
+//		__HAL_TIM_SET_COUNTER(&EDG_DS18B20_TIM_BASE_HANDLER, 0);
+//		EDG_DS18B20_ChangePinInput(&hedgDS18B20, 1);
+//		TEMP = __HAL_TIM_GET_COUNTER(&EDG_DS18B20_TIM_BASE_HANDLER);
+//		sprintf((char *)stringDebug, "Tiempo a input = %d\n", TEMP);
+//		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+//
+//		HAL_Delay(1000);
+//	}
+
+
 	while(1)
 	{
 			EDG_DS18B20_ReadAllChipsTemperature(&hedgDS18B20);
 			EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
-			sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]T1=%.02f;T1=%.02f\n", hedgRTC.CurrentDate.Hour,
+			sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d];%.02f;%.02f;%02d;%02d\n", hedgRTC.CurrentDate.Hour,
 																							  hedgRTC.CurrentDate.Minute,
 																							  hedgRTC.CurrentDate.Second,
 																						      hedgRTC.CurrentDate.Day,
 																						      hedgRTC.CurrentDate.Month,
 																							  hedgRTC.CurrentDate.Year,
 																							  hedgDS18B20.Chip[0].Temperature,
-																							  hedgDS18B20.Chip[1].Temperature);
+																							  hedgDS18B20.Chip[1].Temperature,
+																							  hedgDS18B20.Chip[0].ChipStatus,
+																							  hedgDS18B20.Chip[1].ChipStatus);
 			HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
-			HAL_Delay(1000);
+			HAL_Delay(2000);
 	}
-	 */
 
 
 
-	while(1)
-	{
-		for(counter = 0; counter < 2; counter++)
-		{
-
-
-		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
-		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
-		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0x44);  // convert t
-
-		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
-		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
-		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xBE);  // Read Scratch-pad
-
-		Temp_byte1 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
-		Temp_byte2 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
-		TEMP = ((Temp_byte2<<8))|Temp_byte1;
-
-		Temperature = (float)((TEMP & 0x7FF) * 0.0625);
-		if((TEMP >> 11) & 0x1F)
-		{
-			Temperature *= -1;
-		}
-		//Temperature = (float)TEMP/16.0;  // resolution is 0.0625
-
-		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
-		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Temperatura Chip %d = %.02f, Presence = %d, %02X %02X\n", hedgRTC.CurrentDate.Hour,
-																							  hedgRTC.CurrentDate.Minute,
-																							  hedgRTC.CurrentDate.Second,
-																							  hedgRTC.CurrentDate.Day,
-																							  hedgRTC.CurrentDate.Month,
-																							  hedgRTC.CurrentDate.Year,
-																							  counter + 1,
-																							  Temperature,
-																							  Presence,
-																							  Temp_byte1,
-																							  Temp_byte2);
-		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
-
-		}
-		HAL_Delay(1000);
-	}
+//	while(1)
+//	{
+//		for(counter = 0; counter < 2; counter++)
+//		{
+//
+//
+//		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
+//		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
+//		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0x44);  // convert t
+//
+//		Presence = EDG_DS18B20_Start(&hedgDS18B20, counter);
+//		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xCC);  // skip ROM
+//		EDG_DS18B20_WriteByte(&hedgDS18B20, counter, 0xBE);  // Read Scratch-pad
+//
+//		Temp_byte1 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
+//		Temp_byte2 = EDG_DS18B20_ReadByte(&hedgDS18B20, counter);
+//		TEMP = ((Temp_byte2<<8))|Temp_byte1;
+//
+//		Temperature = (float)((TEMP & 0x7FF) * 0.0625);
+//		if(((TEMP >> 11) & 0x001F) == 0x001F)
+//		{
+//			Temperature *= -1;
+//		}
+//		//Temperature = (float)TEMP/16.0;  // resolution is 0.0625
+//
+//		EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
+//		sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d]Temperatura Chip %d = %.02f, Presence = %d, %02X %02X\n", hedgRTC.CurrentDate.Hour,
+//																							  hedgRTC.CurrentDate.Minute,
+//																							  hedgRTC.CurrentDate.Second,
+//																							  hedgRTC.CurrentDate.Day,
+//																							  hedgRTC.CurrentDate.Month,
+//																							  hedgRTC.CurrentDate.Year,
+//																							  counter + 1,
+//																							  Temperature,
+//																							  Presence,
+//																							  Temp_byte1,
+//																							  Temp_byte2);
+//		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+//
+//		}
+//		HAL_Delay(1000);
+//	}
 
 
 	/*
@@ -1868,7 +1895,7 @@ void EDG_STATE_MACHINE_TestTempetatureChips(void)
 #if EDG_STATE_MACHINE_DEBUG_STATE == EDG_STATE_MACHINE_DEBUG_ACTIVE
 
 	EDG_RTC_GetDate(&hedgRTC, EDG_RTC_ADDRESS);
-	sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d],", hedgRTC.CurrentDate.Hour,
+	sprintf((char *)stringDebug, "[%02d:%02d:%02d-%02d/%02d/%02d];", hedgRTC.CurrentDate.Hour,
 																	 hedgRTC.CurrentDate.Minute,
 																	 hedgRTC.CurrentDate.Second,
 																	 hedgRTC.CurrentDate.Day,
@@ -1877,12 +1904,17 @@ void EDG_STATE_MACHINE_TestTempetatureChips(void)
 	HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
 	for(Counter = 0; Counter < hedgDS18B20.ChipsToRead; Counter++)
 	{
-		sprintf((char *)stringDebug, "%3.02f,", hedgDS18B20.Chip[Counter].Temperature);
+		sprintf((char *)stringDebug, "%3.02f;", hedgDS18B20.Chip[Counter].Temperature);
 		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
 	}
 	for(Counter = 0; Counter < hedgAccontrol.UnitsQty; Counter++)
 	{
-		sprintf((char *)stringDebug, "%3.02f,", hedgAccontrol.Units[Counter].Pid.SetPoint);
+		sprintf((char *)stringDebug, "%3.02f;", hedgAccontrol.Units[Counter].Pid.SetPoint);
+		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
+	}
+	for(Counter = 0; Counter < hedgDS18B20.ChipsToRead; Counter++)
+	{
+		sprintf((char *)stringDebug, "%01d;", (int)hedgDS18B20.Chip[Counter].ReadStatus);
 		HAL_UART_Transmit(&EDG_STATE_MACHINE_DEBUG_PORT_HANDLE, stringDebug, strlen((const char*)stringDebug), 100);
 	}
 	sprintf((char *)stringDebug, "\n");
@@ -1899,70 +1931,111 @@ void EDG_STATE_MACHINE_TestTempetatureChips(void)
   */
 void EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PageTypeDef page)
 {
+	uint8_t counter = 0;
 
 	EDG_NEXTION_ChangePage(&hedgNextion, page);
-	if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_EXECUTE)
+	switch(hedgNextion.CurrentPage)
 	{
-		EDG_STATE_MACHINE_LoadProgramValues(0, 0);
-	}
-	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_PROGRAM)
-	{
-		EDG_STATE_MACHINE_LoadProgramValues(0, 0);
-	}
-	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_SCHEDULE)
-	{
-		EDG_STATE_MACHINE_LoadScheduleValues();
-		EDG_STATE_MACHINE_CheckButtonSchedule();
-	}
-	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_MANUAL)
-	{
-		if(hedgProcessor.FlagsStatus.FlagCarouselPos)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"bt0.val=1");
+
+		case EDG_NEXTION_PAGE_EXECUTE:
+
+			EDG_STATE_MACHINE_LoadProgramValues(0, 0);
+			EDG_STATE_MACHINE_RefreshExecutePage();
+
+			break;
+
+		case EDG_NEXTION_PAGE_PROGRAM:
+
+			EDG_STATE_MACHINE_LoadProgramValues(0, 1);
+
+			break;
+
+		case EDG_NEXTION_PAGE_SCHEDULE:
+
+			EDG_STATE_MACHINE_LoadScheduleValues();
+			EDG_STATE_MACHINE_CheckButtonSchedule();
+
+			break;
+
+		case EDG_NEXTION_PAGE_MANUAL:
+
+			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PRESIONE UN BOTON\"");
 			EDG_NEXTION_SendFrame(&hedgNextion);
-		}
-		if(hedgProcessor.FlagsStatus.FlagShaking)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"bt1.val=1");
+			if(hedgProcessor.FlagsStatus.FlagCarouselPos)
+			{
+				sprintf((char *)hedgNextion.TxFrame,"bt0.val=1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+			}
+			if(hedgProcessor.FlagsStatus.FlagShaking)
+			{
+				sprintf((char *)hedgNextion.TxFrame,"bt1.val=1");
+				EDG_NEXTION_SendFrame(&hedgNextion);
+			}
+
+			break;
+
+		case EDG_NEXTION_PAGE_MENU:
+
+			if((hedgRTC.CurrentState != EDG_RTC_STATE_OK) && (hedgAccontrol.SensorsInAlarm != 0))
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"        ERROR EN EL RELOJ Y EN                 UNO O VARIOS SENSORES...\"");
+			}
+			else if(hedgRTC.CurrentState != EDG_RTC_STATE_OK)
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN EL RELOJ...\"");
+
+			}
+			else if((hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED) && (hedgAccontrol.SensorsInAlarm != 0))
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"     RELOJ DESCONFIGURADO Y ERROR EN            UNO O VARIOS SENSORES...\"");
+			}
+			else if(hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED)
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"RELOJ DESCONFIGURADO...\"");
+			}
+			else if(hedgAccontrol.SensorsInAlarm != 0)
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN UNO O VARIOS SENSORES...\"");
+			}
+			else
+			{
+				sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROCESADOR EN FUNCIONAMIENTO NORMAL\"");
+			}
+
 			EDG_NEXTION_SendFrame(&hedgNextion);
-		}
-	}
-	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_MENU)
-	{
-		if((hedgRTC.CurrentState != EDG_RTC_STATE_OK) && (hedgAccontrol.SensorsInAlarm != 0))
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"        ERROR EN EL RELOJ Y EN                 UNO O VARIOS SENSORES...\"");
-		}
-		else if(hedgRTC.CurrentState != EDG_RTC_STATE_OK)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN EL RELOJ...\"");
+			EDG_STATE_MACHINE_CheckButtonBuzzer();
 
-		}
-		else if((hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED) && (hedgAccontrol.SensorsInAlarm != 0))
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"     RELOJ DESCONFIGURADO Y ERROR EN            UNO O VARIOS SENSORES...\"");
-		}
-		else if(hedgRTC.DateState == EDG_RTC_DATE_STATE_UNCONFIGURED)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"RELOJ DESCONFIGURADO...\"");
-		}
-		else if(hedgAccontrol.SensorsInAlarm != 0)
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"ERROR EN UNO O VARIOS SENSORES...\"");
-		}
-		else
-		{
-			sprintf((char *)hedgNextion.TxFrame,"t0.txt=\"PROCESADOR EN FUNCIONAMIENTO NORMAL\"");
-		}
+			break;
 
-		EDG_NEXTION_SendFrame(&hedgNextion);
-		EDG_STATE_MACHINE_CheckButtonBuzzer();
-	}
-	else if(hedgNextion.CurrentPage == EDG_NEXTION_PAGE_OFFSET)
-	{
-		EDG_STATE_MACHINE_LoadOffsetValues();
-	}
+		case EDG_NEXTION_PAGE_OFFSET:
 
+			EDG_STATE_MACHINE_LoadOffsetValues();
+
+			break;
+
+		case EDG_NEXTION_PAGE_ALARM:
+
+			for(counter = 0; counter < hedgAccontrol.UnitsQty; counter++)
+			{
+				if(hedgAccontrol.UnitsInAlarm & (1U << counter))
+				{
+					sprintf((char *)hedgNextion.TxFrame,"tx%d.txt=\"VASO %d\"", counter, counter + 1);
+					EDG_NEXTION_SendFrame(&hedgNextion);
+				}
+			}
+			sprintf((char *)hedgNextion.TxFrame,"t50.txt=\" EN TEMPERATURA ALTA, ESPERE UN MOMENTO O APAGUE   EL EQUIPO\"");
+			EDG_NEXTION_SendFrame(&hedgNextion);
+
+			break;
+
+		default:
+
+			break;
+
+	}
+	EDG_STATE_MACHINE_ShowDate();
+
+	return;
 }
 
 /**
@@ -2651,7 +2724,7 @@ void EDG_STATE_MACHINE_ResumeActiveProcess(void)
 
 	uint8_t Counter;
 
-	EDG_STATE_MACHINE_ChangePage(EDG_NEXTION_PAGE_EXECUTE);
+	EDG_NEXTION_ChangePage(&hedgNextion, EDG_NEXTION_PAGE_EXECUTE);
 	EDG_STATE_MACHINE_ShowDate();
 
 	sprintf((char *)hedgNextion.TxFrame,"n24.val=%d", hedgProcessor.CurrentProcess[EDG_PROCESSOR_ARR_POS_CURR_PROGRAM] + 1);

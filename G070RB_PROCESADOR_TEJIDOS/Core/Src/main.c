@@ -110,7 +110,6 @@ int main(void)
 #if ENG_STATE_MACH_WATCHDOG == 1
   MX_IWDG_Init();
 #endif
-
   /* USER CODE BEGIN 2 */
 
   InitCpp();

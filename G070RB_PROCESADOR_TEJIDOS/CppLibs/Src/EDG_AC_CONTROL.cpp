@@ -133,37 +133,61 @@ void EDG_AC_CONTROL_CheckSensors(EDG_AC_CONTROL_HandleTypeDef * ptrhedgAccontrol
 
 	for(ptrhedgAccontrol->UnitsCounter = 0; ptrhedgAccontrol->UnitsCounter < ptrhedgAccontrol->UnitsQty; ptrhedgAccontrol->UnitsCounter++)
 	{
-		/*** Check the status of each chip to set the values of each unit ***/
+		// Check the status of each chip to set the values of each unit
 		if(ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus != EDG_DS18B20_STATUS_OK)
 		{
-			/*** If the chip is set as TC open then set the sensor status as not present ***/
+			// If the chip is set as TC open then set the sensor status as not present
 			if(ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus == EDG_DS18B20_STATUS_ERROR)
 			{
 				ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_ERROR;
 				ptrhedgAccontrol->SensorsInAlarm |= (1<< ptrhedgAccontrol->UnitsCounter);
 			}
 
-			/*** If the chip is not right and was active stop output ***/
+			// If the chip is not right and was active stop output
 			if((ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus == EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE) ||
 			   (ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus == EDG_AC_CONTROL_PWM_STATUS_ACTIVE))
 			{
 				EDG_AC_CONTROL_StopPWMOutput(ptrhedgAccontrol, ptrhedgAccontrol->UnitsCounter);
+				ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
 			}
-
-			/*** If the chip is not right the control flag is inactive ***/
-			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
-			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
-			/*** Set error value of current value ***/
-			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = 0;
 
 		}
 		else
 		{
 			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_OK;
-			/*** If the chip is right the control flag is active ***/
+			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].Temperature;
+		}
+
+		/*
+		// If the chip is set as TC open then set the sensor status as not present
+		if(ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].ChipStatus == EDG_DS18B20_STATUS_ERROR)
+		{
+			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_ERROR;
+			ptrhedgAccontrol->SensorsInAlarm |= (1<< ptrhedgAccontrol->UnitsCounter);
+		}
+
+		// If the chip is not right and was active stop output
+		if((ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus == EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE) ||
+		   (ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus == EDG_AC_CONTROL_PWM_STATUS_ACTIVE))
+		{
+			EDG_AC_CONTROL_StopPWMOutput(ptrhedgAccontrol, ptrhedgAccontrol->UnitsCounter);
+		}
+
+		// If the chip is not right the control flag is inactive
+		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_INACTIVE;
+		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].PwmStatus = EDG_AC_CONTROL_PWM_STATUS_INACTIVE;
+		// Set error value of current value
+		ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = 0;
+
+		}
+		else
+		{
+			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].SensorStatus = EDG_AC_CONTROL_SENSOR_STATUS_OK;
+			// If the chip is right the control flag is active
 			//ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].ControlStatus = EDG_AC_CONTROL_CONTROL_STATUS_ACTIVE;
 			ptrhedgAccontrol->Units[ptrhedgAccontrol->UnitsCounter].Pid.CurrentValue = ptrhedgDS18B20->Chip[ptrhedgAccontrol->UnitsCounter].Temperature;
 		}
+		*/
 	}
 
 	return;

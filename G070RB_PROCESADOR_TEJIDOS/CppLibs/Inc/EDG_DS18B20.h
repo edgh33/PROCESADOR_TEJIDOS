@@ -28,9 +28,9 @@ extern "C" {
 
 #define EDG_DS18B20_MAX_NUM_CHIPS 			(2)
 #define EDG_DS18B20_ALL_CHIPS_ENABLED_MASK 	(0x03)
-#define EDG_DS18B20_MAX_READ_TRIES			(6)
-#define EDG_DS18B20_MAX_READ_DIFFERENCE		(10)
-#define EDG_DS18B20_DELAY_BETWEEN_READ_US	(100)
+#define EDG_DS18B20_MAX_READ_TRIES			(4)
+#define EDG_DS18B20_MAX_READ_DIFFERENCE		(3)
+#define EDG_DS18B20_DELAY_BETWEEN_READ_US	(20)
 
 typedef enum
 {
@@ -51,8 +51,10 @@ typedef struct __EDG_DS18B20_ChipStructTypeDef
 {
 	GPIO_TypeDef *GPIOx;
 	uint16_t GPIO_Pin;
+	uint32_t PinPosition;
 	EDG_DS18B20_StatusTypeDef ChipStatus;
 	EDG_DS18B20_ReadStatusTypeDef ReadStatus;
+	uint8_t ErrorCounter;
 	float Temperature;
 
 }EDG_DS18B20_ChipStructTypeDef;
@@ -86,11 +88,14 @@ void EDG_DS18B20_WriteByte (EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t 
 uint8_t EDG_DS18B20_ReadByte(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t NumChip);
 void EDG_DS18B20_FirstReadChipTemperature(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint8_t NumChip);
 void EDG_DS18B20_ReadChipTemperature(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint8_t NumChip);
+void EDG_DS18B20_ReadChipScratchpad(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint8_t NumChip);
 void EDG_DS18B20_ReadAllChipsTemperature(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20);
 void EDG_DS18B20_ChangePinOutput(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t NumChip);
 void EDG_DS18B20_ChangePinInput(EDG_DS18B20_HandleTypeDef *ptrhedgDS18B20, uint16_t NumChip);
 void EDG_DS18B20_TimStart(void);
 void EDG_DS18B20_DelayUs(uint16_t delay);
+void EDG_DS18B20_DelaySysClk(uint16_t delay);
+uint8_t EDG_DS18B20_Crc8(uint8_t *addr, uint8_t len);
 
 #ifdef __cplusplus
 }

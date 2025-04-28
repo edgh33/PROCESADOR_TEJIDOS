@@ -68,10 +68,10 @@ void Error_Handler(void);
 #define RELE_START_GPIO_Port GPIOC
 #define RELE_MANUAL_Pin GPIO_PIN_3
 #define RELE_MANUAL_GPIO_Port GPIOC
-#define TX_EXT_Pin GPIO_PIN_2
-#define TX_EXT_GPIO_Port GPIOA
-#define RX_EXT_Pin GPIO_PIN_3
-#define RX_EXT_GPIO_Port GPIOA
+#define TEMP1_Pin GPIO_PIN_2
+#define TEMP1_GPIO_Port GPIOA
+#define TEMP2_Pin GPIO_PIN_3
+#define TEMP2_GPIO_Port GPIOA
 #define PIN_WS2812_Pin GPIO_PIN_4
 #define PIN_WS2812_GPIO_Port GPIOA
 #define CS0_Pin GPIO_PIN_7
@@ -86,10 +86,6 @@ void Error_Handler(void);
 #define CONTROL_6_GPIO_Port GPIOB
 #define RELE_AC_Pin GPIO_PIN_12
 #define RELE_AC_GPIO_Port GPIOB
-#define TEMP1_Pin GPIO_PIN_13
-#define TEMP1_GPIO_Port GPIOB
-#define TEMP2_Pin GPIO_PIN_14
-#define TEMP2_GPIO_Port GPIOB
 #define CONTROL_1_Pin GPIO_PIN_8
 #define CONTROL_1_GPIO_Port GPIOA
 #define CRUCE_CERO_1_Pin GPIO_PIN_9

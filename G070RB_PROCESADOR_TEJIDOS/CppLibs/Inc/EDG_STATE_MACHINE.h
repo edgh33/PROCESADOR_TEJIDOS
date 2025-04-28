@@ -33,7 +33,7 @@ extern "C" {
 #define EDG_STATE_MACHINE_DEBUG_PORT		USART3
 #define EDG_STATE_MACHINE_DEBUG_PORT_HANDLE huart3
 
-#define ENG_STATE_MACH_WATCHDOG			1	//Enable watchdog in code
+#define ENG_STATE_MACH_WATCHDOG			0	//Enable watchdog in code
 
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_UNIT	 (1)
 #define EDG_STATE_MACHINE_CHANGE_TEMP_POS_ACTIVE (2)
@@ -152,6 +152,8 @@ void EDG_STATE_MACHINE_SetTemperatureProcess(void);
 
 void EDG_STATE_MACHINE_HideButtonsExecute(void);
 void EDG_STATE_MACHINE_ShowButtonsExecute(void);
+
+void EDG_STATE_MACHINE_PrintDataLog(void);
 
 #ifdef __cplusplus
 }
